@@ -40,6 +40,17 @@ class DatabaseManager:
             self.connection.rollback()
             self._close()
 
+    def get_channel_data(self):
+        self.cursor.execute(
+            "SELECT * FROM youtube_feed_summary.channel LIMIT 1")
+        row = self.cursor.fetchall()
+
+        if row:
+            print(row)
+            return row[0][0], row[0][1]
+        else:
+            raise ValueError("channelテーブルにデータが存在しません")
+
     def get_not_send_summaries_data(self):
         self.cursor.execute("SELECT v.title, s.summary, v.link, v.video_id FROM youtube_feed_summary.summary s JOIN youtube_feed_summary.video v ON s.video_id = v.video_id WHERE v.summary_send_flag = false AND s.summary IS NOT NULL LIMIT 1")
         rows = self.cursor.fetchall()
