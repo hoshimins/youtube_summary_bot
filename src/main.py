@@ -33,9 +33,9 @@ def main(mode):
 
 def get_data(mode, dbManager):
     """指定されたモードによって動画情報を取得する"""
+    channel_id, channel_name = dbManager.get_channel_data()
 
     if mode == "latest":
-        channel_id, channel_name = dbManager.get_channel_data()
         RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
         new_data = fetch_rss_feed.get_latest_videos(RSS_URL)
         db_data = dbManager.get_db_data(channel_id)
