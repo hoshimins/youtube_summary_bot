@@ -15,7 +15,7 @@ class YoutubeSummaryBot(discord.Client):
     async def on_ready(self):
         print(f'Logged in as {self.user} (ID: {self.user.id})')
         print('------')
-        self.get_summary()
+        await self.get_summary()
 
     async def on_message(self, message):
         if message.author == self.user:
