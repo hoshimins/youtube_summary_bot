@@ -8,7 +8,7 @@ def main():
     intents = discord.Intents.default()
     intents.message_content = True
     bot = youtube_summary_bot.YoutubeSummaryBot(intents=intents)
-    bot.run(bot.TOKEN)
+    bot.run(bot.token)
 
 
 if __name__ == "__main__":
