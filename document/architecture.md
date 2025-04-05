@@ -52,7 +52,7 @@ graph TD
     DatabaseManager --> Postgres
 
     %% MainScript outputs
-    MainScript -->|Cront Trigger| DChannel
+    MainScript -->|Cron Trigger| DChannel
 
 
 ```

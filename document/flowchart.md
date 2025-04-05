@@ -4,7 +4,7 @@
 ```mermaid
 graph TD
 
-Cron["Crontab get_summary_latest"] -->|Cron Triger| YoutubeSummaryFeed["Main"]
+Cron["Crontab get_summary_latest"] -->|Cron Trigger| YoutubeSummaryFeed["Main"]
 YoutubeSummaryFeed --> |DBの最新情報を取得| DB["DatabaseManager get_db_data(channel_id)"]
 DB --> |RSSから最新の情報を取得| RSS["fetch_rss_feed get_latest_videos(rss_url)"]
 RSS --> |DBとRSSをで差分があるか|compare{"compare_data"}
@@ -28,7 +28,7 @@ compare --> |差分なし| compare_end --> End
 ```mermaid
 graph TD
 
-Cron["Crontab get_all_channel_video"] -->|Cron Triger| YoutubeSummaryFeed["Main"]
+Cron["Crontab get_all_channel_video"] -->|Cron Trigger| YoutubeSummaryFeed["Main"]
 YoutubeSummaryFeed --> |指定ちゃんねるの全動画情報を取得| YoutubeFetcher["YoutubeFetcher get_all_videos(channel_id)"]
 YoutubeFetcher --> |取得した情報をDBに保存| SaveDB["DatabaseManager save_db_new_data(new_data, channel_id, channel_name)"]
 SaveDB --> End["終了"]
@@ -37,7 +37,7 @@ SaveDB --> End["終了"]
 ## 要約をDiscordに投稿するフロー
 ```mermaid
 graph TD
-Cron["Crontab send_summary_for_discord"] -->|Cron Triger| DiscordSend["Main"]
+Cron["Crontab send_summary_for_discord"] -->|Cron Trigger| DiscordSend["Main"]
 DiscordSend --> |要約をDiscordに送信| SendMessage["send_message_to_discord(summary)"]
 SendMessage --> End["終了"]
 
