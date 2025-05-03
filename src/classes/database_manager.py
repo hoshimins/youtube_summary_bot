@@ -46,7 +46,6 @@ class DatabaseManager:
         row = self.cursor.fetchall()
 
         if row:
-            print(row)
             return row[0][0], row[0][1]
         else:
             raise ValueError("channelテーブルにデータが存在しません")
