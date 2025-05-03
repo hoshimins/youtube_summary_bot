@@ -33,9 +33,9 @@ def main(mode):
 
 def get_data(mode, dbManager):
     """指定されたモードによって動画情報を取得する"""
-    channel_id, channel_name = dbManager.get_channel_data()
 
     if mode == "latest":
+        channel_id, channel_name = dbManager.get_channel_data()
         RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
         new_data = fetch_rss_feed.get_latest_videos(RSS_URL)
         db_data = dbManager.get_db_data(channel_id)
@@ -49,8 +49,15 @@ def get_data(mode, dbManager):
         dbManager.save_db_new_data(new_data, channel_id, channel_name)
 
     elif mode == "all":
-        new_data = YoutubeFetcher.get_all_videos(channel_id)
+        youtube_fetcher = YoutubeFetcher()
+        new_data = youtube_fetcher.fetch_all_videos('UCCiOsYX3Q3wtgvtep-x_yjA')
         dbManager.save_db_new_data(new_data, channel_id, channel_name)
+
+    else:
+        channel_id, channel_name = dbManager.get_channel_data()
+        youtube_fetcher = YoutubeFetcher()
+        new_data = youtube_fetcher.get_video_info(mode)
+        dbManager.save_db_new_data([new_data], channel_id, channel_name)
 
 
 if __name__ == '__main__':
@@ -63,8 +70,10 @@ if __name__ == '__main__':
         mode = "all"
     elif args[1] == "latest":
         mode = "latest"
+    elif args[1] == "id":
+        mode = args[2]
     else:
-        print("無効な引数です")
+        print("不正な引数です")
         sys.exit(1)
 
     print(f"mode: {mode} で実行します")
