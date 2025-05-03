@@ -7,7 +7,7 @@ class YoutubeSummaryBot(discord.Client):
     def __init__(self, intents: discord.Intents):
         super().__init__(intents=intents)
         self.token = os.getenv("DISCORD_TOKEN")
-        self.forum_channel_id = os.getenv("FORUM_CHANNEL_ID")
+        self.summary_text_ch = int(os.getenv("SUMMARY_TEXT_CHANNEL_ID"))
         if self.token is None:
             raise ValueError(
                 "DISCORD_TOKEN is not set in the environment variables.")
@@ -31,17 +31,16 @@ class YoutubeSummaryBot(discord.Client):
         db_manager._close()
 
     async def _send_summary_message_to_forum(self, data):
-        forum_channel = self.get_channel(self.forum_channel_id)
+        summary_text_ch = self.get_channel(self.summary_text_ch)
+        if summary_text_ch is None:
+            print(f"[ERROR] チャンネルID {self.summary_text_ch} が見つかりません")
+            return
 
-        if isinstance(forum_channel, discord.ForumChannel):
-            title = f"【要約】{data[0][0]}"
-            content = f"{data[0][1]} \n\n{data[0][2]}"
+        title = f"#【要約】\n ## {data[0][0]} \n\n"
+        message = f"> {data[0][1]} \n\n{data[0][2]}"
 
-            await forum_channel.create_thread(
-                name=title,
-                content=content,
-                auto_archive_duration=10080
-            )
+        content = f"{title}{message}"
 
-        else:
-            print("指定されたチャンネルはフォーラムチャンネルではありません。")
+        await summary_text_ch.send(
+            content=content,
+        )
