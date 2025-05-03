@@ -51,7 +51,7 @@ class DatabaseManager:
             raise ValueError("channelテーブルにデータが存在しません")
 
     def get_not_send_summaries_data(self):
-        self.cursor.execute("SELECT v.title, s.summary, v.link, v.video_id FROM youtube_feed_summary.summary s JOIN youtube_feed_summary.video v ON s.video_id = v.video_id WHERE v.summary_send_flag = false AND s.summary IS NOT NULL LIMIT 1")
+        self.cursor.execute("SELECT v.title, s.summary, v.link, v.video_id, v.published FROM youtube_feed_summary.summary s JOIN youtube_feed_summary.video v ON s.video_id = v.video_id WHERE v.summary_send_flag = false AND s.summary IS NOT NULL ORDER BY v.published")
         rows = self.cursor.fetchall()
         return rows
 
