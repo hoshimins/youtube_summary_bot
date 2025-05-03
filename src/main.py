@@ -13,7 +13,6 @@ def main(mode):
     dbManager = DatabaseManager()
     get_data(mode, dbManager)
 
-    return
     no_caption_record = dbManager.get_none_caption_record()
     if not no_caption_record:
         print("captionsがないレコードはありません")
