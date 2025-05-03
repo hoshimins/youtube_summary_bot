@@ -16,6 +16,24 @@ class YoutubeFetcher():
         playlist_id = self._get_uploads_playlist_id(channel_id)
         return self._get_all_videos_from_playlist(playlist_id)
 
+    def get_video_info(self, video_id: str) -> Dict[str, str]:
+        """動画IDから動画情報を取得"""
+        response = self.youtube.videos().list(
+            part="snippet",
+            id=video_id
+        ).execute()
+
+        if not response["items"]:
+            return {}
+
+        item = response["items"][0]["snippet"]
+        return {
+            "video_id": video_id,
+            "title": item["title"],
+            "published": item["publishedAt"],
+            "link": f'https://www.youtube.com/watch?v={video_id}'
+        }
+
     def _get_uploads_playlist_id(self, channel_id: str) -> str:
         """uploadsプレイリストIDを取得"""
         response = self.youtube.channels().list(
