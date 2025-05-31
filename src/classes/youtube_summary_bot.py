@@ -1,10 +1,12 @@
 import os
+import sys
 import discord
 import requests
 from classes.database_manager import DatabaseManager
 
 
 class YoutubeSummaryBot(discord.Client):
+
     def __init__(self):
         self.webhook_url = os.getenv("WEBHOOK_URL")
         self.summary_text_ch = int(os.getenv("SUMMARY_TEXT_CHANNEL_ID"))
@@ -19,15 +21,26 @@ class YoutubeSummaryBot(discord.Client):
         db_manager._close()
 
     async def _send_summary_message(self, data):
+        MAX_MESSAGE_LENGTH = 1950  # Discordのメッセージの最大長は2000文字だが、安全に1950文字に設定
 
-        title = f"# 【要約】\n## {data[0][0]} \n\n"
-        message = f"{data[0][1]} \n\n{data[0][2]}"
+        # 送信準備
+        title = data[0][0].strip()
+        summary = data[0][1].strip()
+        url = data[0][2].strip()
 
-        content = f"{title}{message}"
+        # 最初にタイトルとURLを送信
+        intro_message = f"**{title}**\n{url}"
+        response = requests.post(self.webhook_url, json={"content": intro_message})
+        if response.status_code != 204:
+            print(f"[1/1] Failed to send intro: {response.status_code}, {response.text}")
+            return
 
-        response = requests.post(self.webhook_url, json={"content": content})
+        # 本文を複数のメッセージ
+        chunks = [summary[i:i + MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
+        for idx, chunk in enumerate(chunks, start=1):
+            response = requests.post(self.webhook_url, json={"content": chunk})
+            if response.status_code != 204:
+                print(f"[{idx}/{len(chunks)}] Failed to send: {response.status_code}, {response.text}")
+                break
 
-        if response.status_code == 204:
-            print("Message sent successfully.")
-        else:
-            print(f"Failed to send message: {response.status_code}, {response.text}")
+        print("Message sent successfully.")
