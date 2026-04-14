@@ -14,9 +14,8 @@ from classes.youtube_fetcher import YoutubeFetcher
 logger = get_logger(__name__)
 
 
-def main(mode):
-    load_env()
-    dbManager = DatabaseManager()
+def fetch_captions(mode, dbManager):
+    """動画情報取得 + 字幕取得（YouTube 依存）"""
     get_data(mode, dbManager)
 
     no_caption_record = dbManager.get_none_caption_record()
@@ -41,8 +40,18 @@ def main(mode):
         dbManager.save_caption_data(video_id, caption_txt)
         logger.info(f"キャプションデータを保存しました: {video_id}")
 
-        summary_text = get_summary.get_summary(caption_txt)
 
+def generate_summaries(dbManager):
+    """要約生成（LM Studio 依存）"""
+    no_summary_record = dbManager.get_none_summary_record()
+    if not no_summary_record:
+        logger.info("要約が未生成のレコードはありません")
+        return
+
+    logger.info(f"要約未生成の動画: {len(no_summary_record)} 件")
+
+    for video_id, caption_txt in no_summary_record:
+        summary_text = get_summary.get_summary(caption_txt)
         dbManager.save_summary_data(video_id, summary_text)
         logger.info(f"要約データを保存しました: {video_id}")
 
@@ -83,15 +92,24 @@ if __name__ == '__main__':
         logger.error("引数が不足しています")
         sys.exit(1)
 
-    if args[1] == "all":
-        mode = "all"
-    elif args[1] == "latest":
-        mode = "latest"
+    load_env()
+    dbManager = DatabaseManager()
+
+    if args[1] == "summarize":
+        logger.info("mode: summarize で実行します")
+        generate_summaries(dbManager)
+
+    elif args[1] in ("all", "latest"):
+        logger.info(f"mode: {args[1]} で実行します")
+        fetch_captions(args[1], dbManager)
+
     elif args[1] == "id":
-        mode = args[2]
+        if len(args) <= 2:
+            logger.error("id モードには video_id が必要です")
+            sys.exit(1)
+        logger.info(f"mode: id ({args[2]}) で実行します")
+        fetch_captions(args[2], dbManager)
+
     else:
         logger.error("不正な引数です")
         sys.exit(1)
-
-    logger.info(f"mode: {mode} で実行します")
-    main(mode)

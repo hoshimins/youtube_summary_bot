@@ -87,6 +87,21 @@ class DatabaseManager:
             self.connection.rollback()
             self._close()
 
+    def get_none_summary_record(self):
+        """caption 取得済みで summary が NULL のレコードを全件取得"""
+        try:
+            self.cursor.execute("""
+                SELECT s.video_id, cp.caption
+                FROM youtube_feed_summary.summary s
+                JOIN youtube_feed_summary.captions cp ON s.video_id = cp.video_id
+                WHERE s.summary IS NULL AND cp.caption IS NOT NULL
+            """)
+            return self.cursor.fetchall()
+        except Exception as e:
+            logger.error(f"未生成要約レコード取得エラー: {e}")
+            self.connection.rollback()
+            self._close()
+
     def save_caption_data(self, video_id, caption):
         """字幕データ保存"""
         try:

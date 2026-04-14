@@ -5,3 +5,4 @@ cd "$PROJECT_ROOT"
 source .venv/bin/activate
 export $(cat .env | xargs)
 python src/main.py latest
+python src/main.py summarize
