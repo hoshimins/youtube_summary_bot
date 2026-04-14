@@ -1,30 +1,45 @@
 import os
 import time
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled
+from youtube_transcript_api._errors import (
+    NoTranscriptFound,
+    TranscriptsDisabled,
+    VideoUnavailable,
+    IpBlocked,
+    RequestBlocked,
+)
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# リトライ不要なエラー（字幕なし・IP ブロック等）
+_NO_TRANSCRIPT_ERRORS = (NoTranscriptFound, TranscriptsDisabled, VideoUnavailable)
+_BLOCKED_ERRORS = (IpBlocked, RequestBlocked)
+
 
 def _get_languages() -> list[str]:
-    """CAPTION_LANGUAGES 環境変数からリストを構築する（デフォルト: ['ja']）"""
-    raw = os.getenv("CAPTION_LANGUAGES", "ja")
+    """CAPTION_LANGUAGES 環境変数からリストを構築する（デフォルト: ['en']）"""
+    raw = os.getenv("CAPTION_LANGUAGES", "en")
     return [lang.strip() for lang in raw.split(",") if lang.strip()]
 
 
 def get_caption(video_id: str, max_retries: int = 3):
     """対象のYouTube動画のIDを指定。字幕が取得できない場合は None を返す。"""
     languages = _get_languages()
+    api = YouTubeTranscriptApi()
 
     for attempt in range(max_retries):
         try:
-            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
-            return " ".join([item["text"] for item in transcript])
+            transcript = api.fetch(video_id, languages=languages)
+            return " ".join([item.text for item in transcript])
 
-        except (NoTranscriptFound, TranscriptsDisabled) as e:
+        except _NO_TRANSCRIPT_ERRORS as e:
             logger.warning(f"字幕なし (video_id={video_id}): {e}")
             return None
+
+        except _BLOCKED_ERRORS as e:
+            logger.error(f"IP ブロック中のため字幕取得を中断します (video_id={video_id}): {e}")
+            raise
 
         except Exception as e:
             if attempt < max_retries - 1:

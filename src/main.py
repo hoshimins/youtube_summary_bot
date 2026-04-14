@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from youtube_transcript_api._errors import IpBlocked, RequestBlocked
 from utils import fetch_rss_feed
 from utils import comparison_data
 from utils import get_caption
@@ -27,7 +28,11 @@ def main(mode):
     sleep_interval = int(os.getenv("CAPTION_SLEEP_INTERVAL", "30"))
 
     for video_id in no_caption_video_id:
-        caption_txt = get_caption.get_caption(video_id)
+        try:
+            caption_txt = get_caption.get_caption(video_id)
+        except (IpBlocked, RequestBlocked):
+            logger.error("YouTube に IP ブロックされています。時間をおいてから再実行してください。")
+            break
         time.sleep(sleep_interval)
         if caption_txt is None:
             logger.warning(f"字幕が取得できなかったためスキップします: {video_id}")
