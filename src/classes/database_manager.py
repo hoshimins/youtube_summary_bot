@@ -1,5 +1,8 @@
 import psycopg2
 import os
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class DatabaseManager:
@@ -30,13 +33,12 @@ class DatabaseManager:
                 self.cursor.execute(
                     "INSERT INTO youtube_feed_summary.channel (channel_id, channel_name) VALUES (%s, %s)", (channel_id, channel_name))
                 self.connection.commit()
-                print(
-                    f"Inserted channel_id: {channel_id} into youtube_feed_summary.channel")
+                logger.info(f"channel_id: {channel_id} を channel テーブルに挿入しました")
             else:
-                print(f"Channel ID {channel_id} already exists in the table.")
+                logger.info(f"Channel ID {channel_id} already exists in the table.")
 
         except Exception as e:
-            print("Error:", e)
+            logger.error(f"チャンネルテーブル確認エラー: {e}")
             self.connection.rollback()
             self._close()
 
@@ -68,20 +70,20 @@ class DatabaseManager:
             return rows
 
         except Exception as e:
-            print("Error:", e)
+            logger.error(f"動画データ取得エラー: {e}")
             self.connection.rollback()
             self._close()
 
     def get_none_caption_record(self):
-        """字幕テーブルの確認&字幕テーブルにデータがない場合は挿入"""
+        """caption が NULL のレコードを全件取得"""
         try:
             self.cursor.execute(
-                "SELECT * FROM youtube_feed_summary.captions cp JOIN youtube_feed_summary.video v ON cp.video_id = v.video_id WHERE cp.caption IS NULL LIMIT 1")
+                "SELECT * FROM youtube_feed_summary.captions cp JOIN youtube_feed_summary.video v ON cp.video_id = v.video_id WHERE cp.caption IS NULL")
             rows = self.cursor.fetchall()
             return rows
 
         except Exception as e:
-            print("Error:", e)
+            logger.error(f"未取得字幕レコード取得エラー: {e}")
             self.connection.rollback()
             self._close()
 
@@ -92,10 +94,9 @@ class DatabaseManager:
                 "UPDATE youtube_feed_summary.captions SET caption = %s, updated_at = NOW() WHERE video_id = %s",
                 (caption, video_id)
             )
-
             self.connection.commit()
         except Exception as e:
-            print("Error:", e)
+            logger.error(f"字幕データ保存エラー (video_id={video_id}): {e}")
             self.connection.rollback()
 
     def save_summary_data(self, video_id, summary):
@@ -105,10 +106,9 @@ class DatabaseManager:
                 "UPDATE youtube_feed_summary.summary SET summary = %s, updated_at = NOW() WHERE video_id = %s",
                 (summary, video_id)
             )
-
             self.connection.commit()
         except Exception as e:
-            print("Error:", e)
+            logger.error(f"要約データ保存エラー (video_id={video_id}): {e}")
             self.connection.rollback()
 
     def save_db_new_data(self, data, channel_id, channel_name):
@@ -118,24 +118,24 @@ class DatabaseManager:
         try:
             for video in data:
                 self.cursor.execute(
-                    "INSERT INTO youtube_feed_summary.video (video_id, title, channel_id, published, link) VALUES (%s, %s, %s, %s, %s)",
+                    "INSERT INTO youtube_feed_summary.video (video_id, title, channel_id, published, link) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
                     (video['video_id'], video['title'], channel_id,
                      video['published'], video['link'])
                 )
 
                 self.cursor.execute(
-                    "INSERT INTO youtube_feed_summary.captions (video_id) VALUES (%s)",
+                    "INSERT INTO youtube_feed_summary.captions (video_id) VALUES (%s) ON CONFLICT DO NOTHING",
                     (video['video_id'],)
                 )
 
                 self.cursor.execute(
-                    "INSERT INTO youtube_feed_summary.summary (video_id) VALUES (%s)",
+                    "INSERT INTO youtube_feed_summary.summary (video_id) VALUES (%s) ON CONFLICT DO NOTHING",
                     (video['video_id'],)
                 )
 
             self.connection.commit()
         except Exception as e:
-            print("Error:", e)
+            logger.error(f"動画データ保存エラー: {e}")
             self.connection.rollback()
-            print("Rollback executed")
+            logger.info("Rollback executed")
             self._close()

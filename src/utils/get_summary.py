@@ -1,9 +1,30 @@
 import os
 import textwrap
 from openai import OpenAI
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def _build_client():
+    """SUMMARY_PROVIDER に応じた OpenAI クライアントとモデル名を返す"""
+    provider = os.getenv('SUMMARY_PROVIDER', 'lmstudio')
+
+    if provider == 'lmstudio':
+        client = OpenAI(
+            base_url=os.getenv('LM_STUDIO_BASE_URL', 'http://localhost:1234/v1'),
+            api_key='lm-studio',
+        )
+        model = os.getenv('LM_STUDIO_MODEL', 'local-model')
+    else:
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        model = 'gpt-4o'
+
+    return client, model
+
 
 def get_summary(caption_txt):
-    """OpenAPI へ字幕情報を渡し、要約情報を得る"""
+    """字幕情報を渡し、要約情報を得る"""
 
     message = textwrap.dedent(f"""\
         あなたは優秀な日本語の長文要約エキスパートです。
@@ -33,11 +54,10 @@ def get_summary(caption_txt):
         {caption_txt}
     """)
 
-    # OpenAPIのエンドポイントURLとAPIキーを設定
-    client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+    client, model = _build_client()
 
     completion = client.chat.completions.create(
-        model="gpt-4o",
+        model=model,
         messages=[{
             "role": "user",
             "content": message,
@@ -45,7 +65,5 @@ def get_summary(caption_txt):
     )
 
     response = completion.choices[0].message.content
-
-    print("要約結果:", response)
-
+    logger.info(f"要約生成完了 (model={model}, chars={len(response)})")
     return response

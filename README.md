@@ -57,16 +57,16 @@ cd youtube_summary_bot
 ### 2. 仮想環境の作成と有効化
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
+uv venv
+source .venv/bin/activate  # Linux/Mac
 # または
-venv\Scripts\activate     # Windows
+.venv\Scripts\activate     # Windows
 ```
 
 ### 3. 依存パッケージのインストール
 
 ```bash
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ### 4. データベースのセットアップ
