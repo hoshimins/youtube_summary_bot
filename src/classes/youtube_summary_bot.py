@@ -1,4 +1,5 @@
 import os
+import time
 import discord
 import requests
 from classes.database_manager import DatabaseManager
@@ -37,6 +38,7 @@ class YoutubeSummaryBot(discord.Client):
 
         chunks = [summary[i:i + MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
         for idx, chunk in enumerate(chunks, start=1):
+            time.sleep(1)
             response = requests.post(self.webhook_url, json={"content": chunk})
             if response.status_code != 204:
                 logger.error(f"[{idx}/{len(chunks)}] メッセージ送信失敗: {response.status_code}, {response.text}")
