@@ -35,6 +35,7 @@ def fetch_captions(mode, dbManager):
         time.sleep(sleep_interval)
         if caption_txt is None:
             logger.warning(f"字幕が取得できなかったためスキップします: {video_id}")
+            dbManager.mark_caption_unavailable(video_id)
             continue
 
         dbManager.save_caption_data(video_id, caption_txt)

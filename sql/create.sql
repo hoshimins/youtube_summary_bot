@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS youtube_feed_summary.video (
 CREATE TABLE IF NOT EXISTS youtube_feed_summary.captions (
     video_id VARCHAR(255) NOT NULL PRIMARY KEY,
     caption TEXT,
+    caption_unavailable BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (video_id) REFERENCES youtube_feed_summary.video (video_id) ON DELETE CASCADE

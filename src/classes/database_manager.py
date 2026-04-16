@@ -75,10 +75,10 @@ class DatabaseManager:
             self._close()
 
     def get_none_caption_record(self):
-        """caption が NULL のレコードを全件取得"""
+        """caption が NULL かつ取得不可フラグが立っていないレコードを全件取得"""
         try:
             self.cursor.execute(
-                "SELECT * FROM youtube_feed_summary.captions cp JOIN youtube_feed_summary.video v ON cp.video_id = v.video_id WHERE cp.caption IS NULL")
+                "SELECT * FROM youtube_feed_summary.captions cp JOIN youtube_feed_summary.video v ON cp.video_id = v.video_id WHERE cp.caption IS NULL AND cp.caption_unavailable = FALSE")
             rows = self.cursor.fetchall()
             return rows
 
@@ -86,6 +86,18 @@ class DatabaseManager:
             logger.error(f"未取得字幕レコード取得エラー: {e}")
             self.connection.rollback()
             self._close()
+
+    def mark_caption_unavailable(self, video_id):
+        """字幕取得不可フラグを立てる（以後スキップ対象）"""
+        try:
+            self.cursor.execute(
+                "UPDATE youtube_feed_summary.captions SET caption_unavailable = TRUE, updated_at = NOW() WHERE video_id = %s",
+                (video_id,)
+            )
+            self.connection.commit()
+        except Exception as e:
+            logger.error(f"字幕不可フラグ更新エラー (video_id={video_id}): {e}")
+            self.connection.rollback()
 
     def get_none_summary_record(self):
         """caption 取得済みで summary が NULL のレコードを全件取得"""
