@@ -88,7 +88,7 @@ youtube_summary_bot/
 | 変数名 | 説明 |
 |--------|------|
 | `DATABASE_URL` | PostgreSQL 接続文字列 |
-| `YOUTUBE_API_KEY` | YouTube Data API v3（`all` / `id` で必要） |
+| `YOUTUBE_API_KEY` | YouTube Data API v3（`all` / `audit` / `id` / チャンネル名自動取得で必要） |
 | `SUMMARY_PROVIDER` | `codex`（既定）/ `openai` / `lmstudio` |
 | `CODEX_BIN` | Codex 実行ファイル（既定: `codex`） |
 | `CODEX_MODEL` | 任意。Codex の `-m` |
@@ -127,6 +127,21 @@ PYTHONPATH=src .venv/bin/python src/main.py summarize
 PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
+### 監査・チャンネル管理
+
+監査は DB を変更せず、登録済みチャンネルごとに YouTube と DB の動画IDを比較する。
+
+```bash
+make audit
+make audit AUDIT_LIMIT=50
+make audit AUDIT_SOURCE=rss
+make audit AUDIT_FORMAT=json
+
+make channel-list
+PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UC... "チャンネル名"
+```
+
+API 全件監査では、YouTubeにありDBにない未取得候補、DBにあるがYouTubeから確認できない動画、字幕・要約・Discord送信の処理状況を出力する。RSS は最新フィードだけの限定比較で、公開動画総数は取得できない。
 ---
 
 ## DB スキーマ概要
