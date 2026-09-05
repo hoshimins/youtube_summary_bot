@@ -16,8 +16,7 @@ class YoutubeSummaryBot:
             raise ValueError("WEBHOOK_URL が設定されていません")
 
     async def get_summary(self):
-        db_manager = DatabaseManager()
-        try:
+        with DatabaseManager() as db_manager:
             summary_data = db_manager.get_not_send_summaries_data()
             if not summary_data:
                 logger.info("未送信の要約はありません")
@@ -30,8 +29,6 @@ class YoutubeSummaryBot:
                 logger.error(
                     "Discord 送信が完了しなかったため summary_send_flag は更新しません"
                 )
-        finally:
-            db_manager._close()
 
     def _send_summary_message(self, data) -> bool:
         """全文送信に成功したら True。途中失敗したら False（フラグ更新しない）。"""
