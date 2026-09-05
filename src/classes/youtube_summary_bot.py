@@ -12,7 +12,8 @@ class YoutubeSummaryBot(discord.Client):
 
     def __init__(self):
         self.webhook_url = os.getenv("WEBHOOK_URL")
-        self.summary_text_ch = int(os.getenv("SUMMARY_TEXT_CHANNEL_ID"))
+        channel_id = os.getenv("SUMMARY_TEXT_CHANNEL_ID", "0")
+        self.summary_text_ch = int(channel_id) if channel_id else 0
 
     async def get_summary(self):
         db_manager = DatabaseManager()

@@ -2,7 +2,9 @@
 
 ## プロジェクト概要
 
-YouTube チャンネルの最新動画を監視し、日本語字幕を取得して OpenAI GPT-4o で要約を生成、Discord Webhook に自動投稿するシステム。cron で定期実行することを前提に設計されている。
+YouTube チャンネルの最新動画を監視し、字幕を取得して AI で要約を生成、Discord Webhook に自動投稿するシステム。cron で定期実行することを前提に設計されている。
+
+要約のデフォルトプロバイダーは **Codex CLI**（自宅サーバーのホストにインストール済みの `codex` を呼び出し）。必要に応じて OpenAI API / LM Studio にも切り替え可能。
 
 ---
 
@@ -10,25 +12,36 @@ YouTube チャンネルの最新動画を監視し、日本語字幕を取得し
 
 ```
 cron
- ├─ get_summary_latest.sh  →  src/main.py latest  (RSS監視 → 字幕取得 → 要約生成)
- └─ send_message.sh        →  src/bot/main.py      (未送信要約を Discord に投稿)
+ ├─ get_summary_latest.sh
+ │    ├─ src/main.py latest     (RSS監視 → 字幕取得 → DB 保存)
+ │    └─ src/main.py summarize  (字幕済み・未要約を Codex 等で要約)
+ └─ send_message.sh → src/bot/main.py  (未送信要約を Discord に投稿・1実行1件)
 ```
 
-### データフロー（main.py latest）
+### データフロー（main.py latest / all / id）
 
-1. DB の `channel` テーブルからチャンネルIDを取得
-2. RSS フィードから最新動画一覧を取得 (`fetch_rss_feed`)
-3. DB の動画一覧と比較して新着を検出 (`comparison_data`)
-4. 新着動画を `video` / `captions` / `summary` テーブルに挿入（caption・summary は NULL）
-5. `captions.caption IS NULL` のレコードを全件処理：
-   - `youtube-transcript-api` で日本語字幕を取得
-   - OpenAI GPT-4o で要約を生成
-   - DB に保存
+1. DB の `channel` テーブルからチャンネルIDを取得（`LIMIT 1`）
+2. モードに応じて動画一覧を取得
+   - `latest`: RSS
+   - `all` / `id`: YouTube Data API v3
+3. 新着を `video` / `captions` / `summary` に挿入（caption・summary は NULL）
+4. `caption IS NULL` かつ `caption_unavailable = FALSE` を処理
+   - `youtube-transcript-api` で字幕取得（`CAPTION_LANGUAGES`）
+   - 長すぎる字幕は `CAPTION_MAX_CHARS` で切り詰めてから DB 保存
+   - 取得不可は `caption_unavailable = TRUE`
+
+### データフロー（main.py summarize）
+
+1. `summary IS NULL` かつ `caption IS NOT NULL` のレコードを取得
+2. `SUMMARY_PROVIDER` に応じて要約
+   - `codex`（デフォルト）: 一時ファイルに字幕を書き、`codex exec` で要約
+   - `openai` / `lmstudio`: OpenAI 互換 Chat Completions
+3. 要約を `summary` テーブルへ保存
 
 ### データフロー（bot/main.py）
 
-1. `summary_send_flag = false` かつ `summary IS NOT NULL` の動画を取得
-2. Discord Webhook へ 1950 文字ずつ分割して送信
+1. `summary_send_flag = false` かつ `summary IS NOT NULL` の最古 1 件を取得
+2. Discord Webhook へ 1950 文字ずつ分割して送信（チャンク間 1 秒）
 3. 送信完了後 `summary_send_flag = true` に更新
 
 ---
@@ -38,74 +51,76 @@ cron
 ```
 youtube_summary_bot/
 ├── src/
-│   ├── main.py                      # エントリポイント。mode=latest|all|<video_id>
+│   ├── main.py                      # latest|all|id|summarize
 │   ├── classes/
-│   │   ├── database_manager.py      # 全 DB 操作（psycopg2）
-│   │   ├── youtube_fetcher.py       # YouTube Data API v3 ラッパー
+│   │   ├── database_manager.py
+│   │   ├── youtube_fetcher.py
 │   │   └── youtube_summary_bot.py   # Discord Webhook 送信
 │   ├── utils/
-│   │   ├── config.py                # .env 読み込み（1度だけ）
-│   │   ├── comparison_data.py       # RSS取得データと DB データの差分比較
-│   │   ├── fetch_rss_feed.py        # RSS フィード取得・パース
-│   │   ├── get_caption.py           # youtube-transcript-api ラッパー
-│   │   └── get_summary.py           # OpenAI GPT-4o 要約生成
-│   ├── bot/
-│   │   └── main.py                  # Discord 投稿エントリポイント
+│   │   ├── config.py
+│   │   ├── comparison_data.py
+│   │   ├── fetch_rss_feed.py
+│   │   ├── get_caption.py
+│   │   ├── caption_text.py          # 字幕正規化・文字数制限
+│   │   ├── get_summary.py           # Codex / OpenAI / LM Studio
+│   │   └── logger.py
+│   ├── bot/main.py
 │   └── script/
-│       ├── get_summary_latest.sh    # cron 用ラッパー（要約生成）
-│       ├── send_message.sh          # cron 用ラッパー（Discord 投稿）
-│       ├── get_summary_latest.py    # スクリプト経由の要約実行
-│       └── get_all_channel_video.py # チャンネル全動画の一括取得スクリプト
+│       ├── get_summary_latest.sh
+│       ├── send_message.sh
+│       ├── get_summary_latest.py
+│       └── get_all_channel_video.py
 ├── sql/
-│   └── create.sql                   # DB スキーマ定義（初回セットアップ用）
-├── document/                        # 設計書（architecture/flowchart/er/class）
+│   ├── create.sql
+│   └── migrate_2026_09_align_schema.sql
+├── document/
+├── Dockerfile                       # 主に字幕取得用（要約はホスト Codex 推奨）
 ├── Makefile
 ├── requirements.txt
-└── .env                             # 環境変数（git 管理外）
+└── .env
 ```
 
 ---
 
 ## 環境変数
 
-`.env` ファイルに以下を設定する。
-
 | 変数名 | 説明 |
 |--------|------|
-| `DATABASE_URL` | PostgreSQL 接続文字列（例: `postgresql://user:pass@host:5432/dbname`）|
-| `YOUTUBE_API_KEY` | YouTube Data API v3 のキー |
-| `OPENAI_API_KEY` | OpenAI API キー |
+| `DATABASE_URL` | PostgreSQL 接続文字列 |
+| `YOUTUBE_API_KEY` | YouTube Data API v3（`all` / `id` で必要） |
+| `SUMMARY_PROVIDER` | `codex`（既定）/ `openai` / `lmstudio` |
+| `CODEX_BIN` | Codex 実行ファイル（既定: `codex`） |
+| `CODEX_MODEL` | 任意。Codex の `-m` |
+| `CODEX_TIMEOUT` | Codex タイムアウト秒（既定: 600） |
+| `LM_STUDIO_BASE_URL` / `LM_STUDIO_MODEL` | LM Studio 用 |
+| `OPENAI_API_KEY` | `SUMMARY_PROVIDER=openai` 用 |
 | `WEBHOOK_URL` | Discord Webhook URL |
-| `SUMMARY_TEXT_CHANNEL_ID` | Discord チャンネル ID（現状未使用、将来のBot化に備えて保持）|
+| `SUMMARY_TEXT_CHANNEL_ID` | 現状 Webhook では未使用 |
+| `CAPTION_LANGUAGES` | 字幕言語優先順（既定: `en`） |
+| `CAPTION_SLEEP_INTERVAL` | 字幕取得間隔秒（既定: 30） |
+| `CAPTION_MAX_CHARS` | DB/要約前の字幕最大文字数（既定: 100000） |
 
 ---
 
 ## 実行方法
 
 ```bash
-# 仮想環境セットアップ（初回）
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+uv venv --python 3.12
+source .venv/bin/activate
+uv pip install -r requirements.txt
 
-# DB スキーマ作成（初回）
 psql -U <user> -d <database> -f sql/create.sql
+# 既存 DB なら
+psql -U <user> -d <database> -f sql/migrate_2026_09_align_schema.sql
 
-# 最新動画の要約生成
+# Step 1: 字幕
 PYTHONPATH=src python src/main.py latest
 
-# 全動画一括取得（DB に channel が登録済みであること）
-PYTHONPATH=src python src/main.py all
+# Step 2: 要約（ホストに Codex ログイン済みであること）
+PYTHONPATH=src python src/main.py summarize
 
-# 特定動画IDで処理
-PYTHONPATH=src python src/main.py id <VIDEO_ID>
-
-# Discord に未送信の要約を投稿
+# Step 3: Discord
 PYTHONPATH=src python src/bot/main.py
-
-# Makefile 経由（latest がデフォルト）
-make run
-make run MODE=all
 ```
 
 ---
@@ -116,12 +131,10 @@ make run MODE=all
 
 | テーブル | 主キー | 説明 |
 |---------|--------|------|
-| `channel` | `channel_id` | 監視対象チャンネル。現状1件のみ想定 |
-| `video` | `video_id` | 動画情報。`summary_send_flag` で Discord 送信済みを管理 |
-| `captions` | `video_id` | 字幕テキスト。NULL = 未取得 |
-| `summary` | `video_id` | 要約テキスト。NULL = 未生成 |
-
-`channel` → `video` → `captions` / `summary` の順で CASCADE DELETE が設定されている。
+| `channel` | `channel_id` | 監視対象。現状 1 件想定 |
+| `video` | `video_id` | `summary_send_flag` で Discord 送信管理。`title` は TEXT |
+| `captions` | `video_id` | 字幕。`caption_unavailable` で取得不可を記録 |
+| `summary` | `video_id` | 要約。NULL = 未生成 |
 
 ---
 
@@ -129,33 +142,25 @@ make run MODE=all
 
 ### コミットメッセージ
 
-日本語で記述。プレフィックス例:
-
-```
-feature: <新機能>
-fix: <バグ修正>
-doc: <ドキュメント更新>
-modify: <既存機能の変更>
-chore: <雑務・設定変更>
-```
+日本語。プレフィックス例: `feature:` / `fix:` / `doc:` / `modify:` / `chore:`
 
 ### ブランチ戦略
 
-- `main` — リリース済みコード
-- `develop` — 開発中コード（PR のマージ先）
+- `main` — リリース済み
+- `develop` — 開発統合
 - `release` — リリース用
-- 機能開発は `feature/<name>` ブランチを切って develop に PR を出す
+- 機能は `feature/<name>` から develop へ PR
 
 ---
 
 ## 既知の制限事項・注意点
 
-- **日本語字幕がない動画はスキップされる**。字幕取得失敗時は `captions.caption` が NULL のまま残る。
-- **`channel` テーブルには1件だけ登録を想定**。`get_channel_data()` は `LIMIT 1` で取得している。マルチチャンネル対応は未実装。
-- **`all` モードは YouTube Data API のクォータを大量消費する**。日次クォータ（10,000ユニット/日）に注意。
-- **`discord.py` は現在 Webhook 送信のみ使用**。`YoutubeSummaryBot` は `discord.Client` を継承しているが Bot 機能は未使用。
-- **cron 実行時は `PYTHONPATH` の設定が必要**。`send_message.sh` 内で `$PROJECT_ROOT/src` をセットしている。
-- **OpenAI API の要約生成は字幕が長いほど時間・コストがかかる**。タイムアウト設定なし。
+- 指定言語の字幕がない動画は `caption_unavailable` になりスキップされる
+- チャンネルは `LIMIT 1`（マルチチャンネル未対応）
+- `all` モードは YouTube API クォータを大量消費する
+- Discord は **1 実行につき 1 動画**（レート制限対策）
+- Codex 要約はホストの `codex` と認証が必要。Docker 内からの利用は想定外
+- 長い字幕は `CAPTION_MAX_CHARS` で切り詰められる
 
 ---
 
@@ -163,7 +168,8 @@ chore: <雑務・設定変更>
 
 | 症状 | 原因 | 対処 |
 |------|------|------|
-| `module not found: utils` | `PYTHONPATH=src` が未設定 | `export PYTHONPATH=src` してから実行 |
-| `channelテーブルにデータが存在しません` | DB の `channel` テーブルが空 | `all` モードや `id` モードの前に channel を手動 INSERT |
-| 字幕取得で無限に失敗 | 対象動画に日本語字幕がない | `get_caption` は `None` を返してスキップするため、`captions` テーブルに NULL レコードが残る。手動でダミー値を UPDATE するか動画をスキップ |
-| Discord に投稿されない | `summary_send_flag` の更新漏れ or `summary IS NULL` | DB を直接確認して `summary_send_flag` と `summary` の状態を確認 |
+| `module not found: utils` | `PYTHONPATH` 未設定 | `export PYTHONPATH=src` |
+| `channelテーブルにデータが存在しません` | channel が空 | 手動 INSERT |
+| Codex が見つからない | PATH / `CODEX_BIN` | ホストで `which codex` |
+| 字幕取得で繰り返し失敗 | 字幕なし | `caption_unavailable` を確認 |
+| Discord に出ない | 未要約 or 送信済み | `summary` と `summary_send_flag` を確認 |

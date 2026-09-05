@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS youtube_feed_summary.channel (
 -- 動画情報保存テーブル
 CREATE TABLE IF NOT EXISTS youtube_feed_summary.video (
     video_id VARCHAR(255) NOT NULL PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
+    title TEXT NOT NULL,
     channel_id VARCHAR(255) NOT NULL,
     published DATE NOT NULL,
     link VARCHAR(255),

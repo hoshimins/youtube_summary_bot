@@ -12,22 +12,23 @@ erDiagram
 
     video {
         varchar(255) video_id PK
-        varchar(255) title
+        text title
         varchar(255) channel_id FK
         date published
         varchar(255) link
-        boolean send_flag
+        boolean summary_send_flag
     }
 
     captions {
-        varchar(255) video_id PK, FK
+        varchar(255) video_id PK_FK
         text caption
+        boolean caption_unavailable
         timestamp created_at
         timestamp updated_at
     }
 
     summary {
-        varchar(255) video_id PK, FK
+        varchar(255) video_id PK_FK
         text summary
         timestamp created_at
         timestamp updated_at
