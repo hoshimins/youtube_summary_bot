@@ -8,12 +8,12 @@ logger = get_logger(__name__)
 
 
 async def main():
-    load_env()
     bot = youtube_summary_bot.YoutubeSummaryBot()
     await bot.get_summary()
 
 
 if __name__ == "__main__":
+    load_env()
     try:
         asyncio.run(main())
     except Exception as e:
