@@ -84,7 +84,11 @@ def _get_summary_via_openai_compatible(caption_txt: str) -> str:
 
 
 def _get_summary_via_codex(caption_txt: str) -> str:
-    """自宅サーバー等にインストール済みの Codex CLI で要約する。"""
+    """自宅サーバー等にインストール済みの Codex CLI で要約する。
+
+    字幕は一時ファイルにも残すが、本体は stdin でプロンプトに埋め込む。
+    （エージェントのファイル読み取りに依存しない）
+    """
     codex_bin = os.getenv("CODEX_BIN", "codex")
     if not shutil.which(codex_bin) and not Path(codex_bin).exists():
         raise FileNotFoundError(
@@ -113,16 +117,17 @@ def _get_summary_via_codex(caption_txt: str) -> str:
         ]
         if model:
             cmd.extend(["-m", model])
+        # プロンプトは argv ではなく stdin（長文の ARG_MAX 回避 + 確実に本文を渡す）
+        cmd.append("-")
 
-        prompt = _build_prompt(caption_txt, caption_file_hint="caption.txt")
-        cmd.append(prompt)
-
+        prompt = _build_prompt(caption_txt)
         logger.info(
             f"Codex で要約を開始します (bin={codex_bin}, model={model or 'default'}, "
-            f"caption_chars={len(caption_txt)}, timeout={timeout}s)"
+            f"caption_chars={len(caption_txt)}, timeout={timeout}s, caption_file={caption_path})"
         )
         completed = subprocess.run(
             cmd,
+            input=prompt,
             capture_output=True,
             text=True,
             timeout=timeout,
