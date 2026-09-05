@@ -130,6 +130,8 @@ PYTHONPATH=src .venv/bin/python src/bot/main.py
 ./src/script/send_message.sh
 ```
 
+cronでは `run_pipeline_step.sh` を使って、動画同期・字幕取得・要約を個別ジョブとして実行します。`get_summary_latest.sh` は手動で一括実行する場合の互換ラッパーです。
+
 ## データ監査とチャンネル管理
 
 cron を再開する前に、YouTube 側の動画と DB の差分を読み取り専用で確認できます。
@@ -165,8 +167,11 @@ PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UCxxxxxxxxxxxx
 ## Cron 設定例
 
 ```cron
-0 * * * * /path/to/youtube_summary_bot/src/script/get_summary_latest.sh >> /path/to/youtube_summary_bot/summary.log 2>&1
-30 * * * * /path/to/youtube_summary_bot/src/script/send_message.sh >> /path/to/youtube_summary_bot/send.log 2>&1
+# 同期・字幕・要約は毎時、Discord送信は毎日21:30（日本時間）。flockで重複起動を防止。
+0 * * * * /usr/bin/flock -n /tmp/youtube-summary-sync.lock /path/to/youtube_summary_bot/src/script/run_pipeline_step.sh sync >> /path/to/youtube_summary_bot/logs/sync.log 2>&1
+10 * * * * /usr/bin/flock -n /tmp/youtube-summary-captions.lock /path/to/youtube_summary_bot/src/script/run_pipeline_step.sh captions >> /path/to/youtube_summary_bot/logs/captions.log 2>&1
+20 * * * * /usr/bin/flock -n /tmp/youtube-summary-summarize.lock /path/to/youtube_summary_bot/src/script/run_pipeline_step.sh summarize >> /path/to/youtube_summary_bot/logs/summarize.log 2>&1
+30 21 * * * /usr/bin/flock -n /tmp/youtube-summary-send.lock /path/to/youtube_summary_bot/src/script/send_message.sh >> /path/to/youtube_summary_bot/logs/send.log 2>&1
 ```
 
 本番の定期実行はホスト上の mise/uv 管理 `.venv` + `src/script/*.sh` + cron を想定しています（Codex CLI もホスト実行）。

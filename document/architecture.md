@@ -1,19 +1,17 @@
 ```mermaid
 graph TD
     subgraph Crontab
-        LatestVideo[get_summary_latest.sh]
+        SyncJob[run_pipeline_step.sh sync]
+        CaptionsJob[run_pipeline_step.sh captions]
+        SummarizeJob[run_pipeline_step.sh summarize]
         SendMessage[send_message.sh]
     end
 
-    subgraph Discord
-        DChannel[Discord Webhook Channel]
-    end
-
     subgraph YoutubeSummaryFeed
-        MainLatest[main.py latest]
+        MainSync[main.py sync]
+        MainCaptions[main.py captions]
         MainSummarize[main.py summarize]
         BotMain[bot/main.py]
-        RSSFeed[RSS Feed]
         YoutubeFetcher[YoutubeFetcher]
         CaptionFetcher[get_caption]
         SummaryGenerator[get_summary]
@@ -30,23 +28,24 @@ graph TD
         Postgres[PostgreSQL]
     end
 
-    LatestVideo -->|latest| MainLatest
-    LatestVideo -->|summarize| MainSummarize
+    SyncJob --> MainSync
+    CaptionsJob --> MainCaptions
+    SummarizeJob --> MainSummarize
     SendMessage --> BotMain
 
-    MainLatest <--> RSSFeed
-    MainLatest <--> CaptionFetcher
-    MainLatest <--> DatabaseManager
-    MainLatest <--> YoutubeFetcher
-
+    MainSync <--> YoutubeFetcher
+    MainSync <--> DatabaseManager
+    MainCaptions <--> CaptionFetcher
+    MainCaptions <--> DatabaseManager
     MainSummarize <--> SummaryGenerator
     MainSummarize <--> DatabaseManager
 
+    YoutubeFetcher --> YTAPI
     CaptionFetcher -->|caption + truncate| DatabaseManager
     SummaryGenerator -->|summary| DatabaseManager
-    YoutubeFetcher --> YTAPI
     SummaryGenerator --> CodexCLI
     SummaryGenerator -.-> OpenAIorLM
     DatabaseManager --> Postgres
-    BotMain -->|1 video / run| DChannel
+    BotMain -->|1 video / run| Postgres
+    BotMain -->|1 video / run| DChannel[Discord Webhook Channel]
 ```
