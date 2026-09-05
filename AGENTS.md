@@ -37,4 +37,4 @@ cron 用: `src/script/get_summary_latest.sh`（latest→summarize）、`src/scri
 
 - Discord は 1 実行 1 動画。送信が全チャンク成功したときだけ `summary_send_flag` を更新する。
 - 失敗通知は `NTFY_URL`（任意）。未設定なら通知しない。
-- Docker は使わない（ホスト cron 前提）。
+- アプリ本体はDocker化せず、ホストのvenv＋cronで動かす。PostgreSQLのみ `deploy/postgres/` の専用コンテナを使う。
