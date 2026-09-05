@@ -119,6 +119,21 @@ PYTHONPATH=src python src/bot/main.py
 
 本番の定期実行はホスト上の venv + `src/script/*.sh` + cron を想定しています（Codex CLI もホスト実行）。
 
+## 自宅サーバーの PostgreSQL
+
+本番ではアプリ本体をホストの venv + cron で実行し、PostgreSQLだけを専用コンテナで動かします。
+既存のSolidtime・Paperless-ngx用PostgreSQLには相乗りさせず、`deploy/postgres/` のComposeプロジェクト、専用ネットワーク、専用永続領域で分離します。
+
+```bash
+cd deploy/postgres
+cp .env.example .env
+# .env の POSTGRES_PASSWORD を設定
+docker compose --env-file .env -f compose.yml up -d
+```
+
+既存のSupabase DBから移行する場合のdump/restore手順は [`deploy/postgres/README.md`](deploy/postgres/README.md) を参照してください。
+
+
 ## 技術スタック
 
 | ライブラリ | 用途 |
