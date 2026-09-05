@@ -70,6 +70,13 @@ CAPTION_MAX_CHARS=100000
 psql -U your_user -d your_database -f sql/migrate_2026_09_align_schema.sql
 ```
 
+失敗通知を使う場合は ntfy トピック URL を設定します。
+
+```bash
+NTFY_URL=https://ntfy.example.com/youtube-summary-bot
+# NTFY_TOKEN=optional_bearer_token
+```
+
 ## 使い方
 
 ```bash

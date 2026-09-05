@@ -100,6 +100,8 @@ youtube_summary_bot/
 | `CAPTION_LANGUAGES` | 字幕言語優先順（既定: `en`） |
 | `CAPTION_SLEEP_INTERVAL` | 字幕取得間隔秒（既定: 30） |
 | `CAPTION_MAX_CHARS` | DB/要約前の字幕最大文字数（既定: 100000） |
+| `NTFY_URL` | 失敗通知用 ntfy トピック URL（未設定なら通知しない） |
+| `NTFY_TOKEN` | ntfy Bearer トークン（任意） |
 
 ---
 

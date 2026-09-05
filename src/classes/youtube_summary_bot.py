@@ -3,6 +3,7 @@ import time
 import requests
 from classes.database_manager import DatabaseManager
 from utils.logger import get_logger
+from utils.notify import notify_failure
 
 logger = get_logger(__name__)
 
@@ -26,8 +27,14 @@ class YoutubeSummaryBot:
             if sent:
                 db_manager.update_summary_send_flag(summary_data[0][3])
             else:
+                title = summary_data[0][0]
+                video_id = summary_data[0][3]
                 logger.error(
                     "Discord 送信が完了しなかったため summary_send_flag は更新しません"
+                )
+                notify_failure(
+                    "Discord 送信失敗",
+                    f"title={title}\nvideo_id={video_id}",
                 )
 
     def _send_summary_message(self, data) -> bool:
