@@ -15,10 +15,14 @@ make setup
 make test
 make run                 # latest（字幕）
 make run MODE=summarize  # 要約
+make audit               # YouTube APIで全件監査
+make audit AUDIT_SOURCE=rss  # RSS最新フィードだけ監査
+make channel-list
+PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UC... "名前"
 PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
-cron 用: `src/script/get_summary_latest.sh`（latest→summarize）、`src/script/send_message.sh`。
+cron 用: `src/script/get_summary_latest.sh`（latest→summarize）、`src/script/send_message.sh`。監査は `src/script/audit_channels.py`、チャンネル登録は `src/script/manage_channels.py`。
 
 ## どこを読むか（必要なときだけ）
 

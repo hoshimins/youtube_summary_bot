@@ -23,7 +23,7 @@ YouTube 動画の字幕を自動取得し、AI（デフォルト: Codex CLI）�
 - uv（miseでリポジトリ単位に固定）
 - Python 3.12.14（miseでリポジトリ単位に固定）
 - PostgreSQL
-- YouTube Data API v3 キー（`all` / `id` モード時）
+- YouTube Data API v3 キー（`all` / `audit` / `id` / チャンネル名自動取得時）
 - **要約用**: ホストにインストール済みの Codex CLI（推奨）または OpenAI / LM Studio
 - Discord Webhook URL
 
@@ -112,6 +112,38 @@ PYTHONPATH=src .venv/bin/python src/bot/main.py
 ./src/script/send_message.sh
 ```
 
+## データ監査とチャンネル管理
+
+cron を再開する前に、YouTube 側の動画と DB の差分を読み取り専用で確認できます。
+
+```bash
+# YouTube Data API でアップロード一覧を全件取得して比較（推奨）
+make audit
+
+# API キーがない場合の簡易確認。RSS の最新フィード（通常は最新15件）のみ
+make audit AUDIT_SOURCE=rss
+
+# API quota を抑えて最新50件だけ比較
+make audit AUDIT_LIMIT=50
+
+# JSON で保存・加工したい場合
+make audit AUDIT_FORMAT=json
+```
+
+API 全件監査では、未取得候補（YouTube に存在するが DB にない動画）と、DB にあるが YouTube から確認できない動画を分けて表示します。AUDIT_LIMIT を指定した場合、比較範囲外の古い DB 動画は削除扱いにしません。RSS 監査では公開動画総数や全期間の差分は判定できません。
+
+監視チャンネルは DB に明示的に登録できます。add は同じチャンネル ID なら表示名を更新するだけで、動画データを削除しません。
+
+```bash
+make channel-list
+
+# 表示名を指定して登録（API キー不要）
+PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UCxxxxxxxxxxxxxxxxxxxxxx "チャンネル名"
+
+# 表示名を省略すると YouTube Data API から取得
+PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UCxxxxxxxxxxxxxxxxxxxxxx
+```
+
 ## Cron 設定例
 
 ```cron
@@ -119,7 +151,7 @@ PYTHONPATH=src .venv/bin/python src/bot/main.py
 30 * * * * /path/to/youtube_summary_bot/src/script/send_message.sh >> /path/to/youtube_summary_bot/send.log 2>&1
 ```
 
-本番の定期実行はホスト上の venv + `src/script/*.sh` + cron を想定しています（Codex CLI もホスト実行）。
+本番の定期実行はホスト上の mise/uv 管理 `.venv` + `src/script/*.sh` + cron を想定しています（Codex CLI もホスト実行）。
 
 ## 自宅サーバーの PostgreSQL
 
@@ -175,7 +207,7 @@ make test             # ローカル単体テスト（GitHub Actions なし）
 
 ## 今後の拡張案
 
-- マルチチャンネル対応
+- 監査結果に基づく自動バックフィル
 - Discord Bot 化
 - 要約プロバイダーの自動フェイルオーバー
 - 失敗時の ntfy 等通知
