@@ -92,6 +92,7 @@ youtube_summary_bot/
 | `CODEX_BIN` | Codex 実行ファイル（既定: `codex`） |
 | `CODEX_MODEL` | 任意。Codex の `-m` |
 | `CODEX_TIMEOUT` | Codex タイムアウト秒（既定: 600） |
+| `SUMMARIZE_BATCH_LIMIT` | 1 回の summarize 最大件数（既定: 3、0 で無制限） |
 | `LM_STUDIO_BASE_URL` / `LM_STUDIO_MODEL` | LM Studio 用 |
 | `OPENAI_API_KEY` | `SUMMARY_PROVIDER=openai` 用 |
 | `WEBHOOK_URL` | Discord Webhook URL |
@@ -158,9 +159,11 @@ PYTHONPATH=src python src/bot/main.py
 - 指定言語の字幕がない動画は `caption_unavailable` になりスキップされる
 - チャンネルは `LIMIT 1`（マルチチャンネル未対応）
 - `all` モードは YouTube API クォータを大量消費する
-- Discord は **1 実行につき 1 動画**（レート制限対策）
+- Discord は **1 実行につき 1 動画**。送信が全チャンク成功したときだけ `summary_send_flag` を更新
+- `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件まで
 - Codex 要約はホストの `codex` と認証が必要。Docker 内からの利用は想定外
 - 長い字幕は `CAPTION_MAX_CHARS` で切り詰められる
+- 既存 DB は `sql/migrate_2026_09_align_schema.sql` の適用が必要な場合がある
 
 ---
 
@@ -171,5 +174,6 @@ PYTHONPATH=src python src/bot/main.py
 | `module not found: utils` | `PYTHONPATH` 未設定 | `export PYTHONPATH=src` |
 | `channelテーブルにデータが存在しません` | channel が空 | 手動 INSERT |
 | Codex が見つからない | PATH / `CODEX_BIN` | ホストで `which codex` |
+| `caption_unavailable` カラムがない | マイグレーション未適用 | `migrate_2026_09_align_schema.sql` |
 | 字幕取得で繰り返し失敗 | 字幕なし | `caption_unavailable` を確認 |
-| Discord に出ない | 未要約 or 送信済み | `summary` と `summary_send_flag` を確認 |
+| Discord に出ない | 未要約 / 送信失敗 / 送信済み | `summary` と `summary_send_flag` を確認 |

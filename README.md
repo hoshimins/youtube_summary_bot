@@ -54,6 +54,7 @@ YOUTUBE_API_KEY=your_youtube_api_key
 SUMMARY_PROVIDER=codex
 CODEX_BIN=codex
 CODEX_TIMEOUT=600
+SUMMARIZE_BATCH_LIMIT=3
 
 WEBHOOK_URL=your_discord_webhook_url
 SUMMARY_TEXT_CHANNEL_ID=0
@@ -61,6 +62,12 @@ SUMMARY_TEXT_CHANNEL_ID=0
 CAPTION_LANGUAGES=en
 CAPTION_SLEEP_INTERVAL=30
 CAPTION_MAX_CHARS=100000
+```
+
+既存 DB には初回だけマイグレーションを適用してください。
+
+```bash
+psql -U your_user -d your_database -f sql/migrate_2026_09_align_schema.sql
 ```
 
 ## 使い方
@@ -105,7 +112,15 @@ PYTHONPATH=src python src/bot/main.py
 
 ## Docker について
 
-`Dockerfile` は主に字幕取得コンテナ向けです。要約はホストの Codex 認証・バイナリを使うため、**本番の `summarize` はホスト実行を推奨**します。
+`Dockerfile` は **字幕取得（`latest`）向けの参考イメージ**です。
+
+| 処理 | 推奨実行場所 |
+|------|----------------|
+| `latest` / `all` / `id` | ホストまたはコンテナ可 |
+| `summarize`（Codex） | **ホスト必須**（`codex` バイナリとログイン状態） |
+| Discord 送信 | ホスト推奨 |
+
+本番の定期実行は `src/script/*.sh` + cron を推奨します。
 
 ```bash
 docker build -t youtube-summary-bot .
@@ -116,7 +131,7 @@ docker run --env-file .env youtube-summary-bot
 
 | ライブラリ | 用途 |
 |-----------|------|
-| discord.py | Discord Webhook |
+| requests | Discord Webhook HTTP 送信 |
 | feedparser | RSS |
 | google-api-python-client | YouTube Data API |
 | openai | OpenAI / LM Studio 互換 API |
@@ -136,8 +151,17 @@ docker run --env-file .env youtube-summary-bot
 
 - 長い字幕は `CAPTION_MAX_CHARS` で切り詰めます（DB 保存失敗やコンテキスト超過の緩和）
 - 字幕言語が無い動画はスキップされ、`caption_unavailable` が立ちます
-- Discord はレート制限対策で 1 実行 1 動画です
-- `channel` は 1 件想定です
+- Discord はレート制限対策で 1 実行 1 動画です。送信失敗時はフラグを更新しません
+- `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件までに制限されます
+- `channel` は 1 件想定です（マルチチャンネル未対応）
+
+## Makefile
+
+```bash
+make run              # latest
+make run MODE=all
+make run MODE=summarize
+```
 
 ## 今後の拡張案
 

@@ -1,12 +1,16 @@
 # Makefile
 
-.PHONY: run
+.PHONY: run help
 
 # default mode is 'latest' if not specified
 MODE ?= latest
 
-# venv の activate
-VENV_ACTIVATE = . .venv/bin/activate
+help:
+	@echo "Usage: make run MODE=latest|all|summarize|id"
+	@echo "  MODE=latest     RSS 監視 + 字幕取得（デフォルト）"
+	@echo "  MODE=all        全動画取得 + 字幕取得"
+	@echo "  MODE=summarize  未要約を要約"
+	@echo "  例: make run MODE=summarize"
 
 # 実行
 run:
