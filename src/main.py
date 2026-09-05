@@ -9,6 +9,7 @@ from utils import get_summary
 from utils.caption_text import prepare_caption_for_storage
 from utils.config import load_env
 from utils.logger import get_logger
+from utils.notify import notify_failure
 from classes.database_manager import DatabaseManager
 from classes.youtube_fetcher import YoutubeFetcher
 
@@ -30,8 +31,10 @@ def fetch_captions(mode, dbManager):
     for index, video_id in enumerate(no_caption_video_id):
         try:
             caption_txt = get_caption.get_caption(video_id)
-        except (IpBlocked, RequestBlocked):
-            logger.error("YouTube に IP ブロックされています。時間をおいてから再実行してください。")
+        except (IpBlocked, RequestBlocked) as e:
+            msg = "YouTube に IP ブロックされています。時間をおいてから再実行してください。"
+            logger.error(msg)
+            notify_failure("字幕取得ブロック", f"{msg}\nvideo_id={video_id}\n{e}")
             break
 
         if caption_txt is None:
@@ -70,15 +73,23 @@ def generate_summaries(dbManager):
     else:
         logger.info(f"要約未生成の動画: {len(no_summary_record)} 件（上限なし）")
 
+    failures = []
     for video_id, caption_txt in no_summary_record:
         try:
             summary_text = get_summary.get_summary(caption_txt)
         except Exception as e:
             logger.error(f"要約生成に失敗しました (video_id={video_id}): {e}")
+            failures.append(f"{video_id}: {e}")
             continue
 
         dbManager.save_summary_data(video_id, summary_text)
         logger.info(f"要約データを保存しました: {video_id}")
+
+    if failures:
+        notify_failure(
+            "要約生成失敗",
+            f"{len(failures)} 件の要約に失敗しました:\n" + "\n".join(failures),
+        )
 
 
 def get_data(mode, dbManager):
@@ -124,22 +135,27 @@ if __name__ == '__main__':
         sys.exit(1)
 
     load_env()
-    with DatabaseManager() as dbManager:
-        if args[1] == "summarize":
-            logger.info("mode: summarize で実行します")
-            generate_summaries(dbManager)
+    try:
+        with DatabaseManager() as dbManager:
+            if args[1] == "summarize":
+                logger.info("mode: summarize で実行します")
+                generate_summaries(dbManager)
 
-        elif args[1] in ("all", "latest"):
-            logger.info(f"mode: {args[1]} で実行します")
-            fetch_captions(args[1], dbManager)
+            elif args[1] in ("all", "latest"):
+                logger.info(f"mode: {args[1]} で実行します")
+                fetch_captions(args[1], dbManager)
 
-        elif args[1] == "id":
-            if len(args) <= 2:
-                logger.error("id モードには video_id が必要です")
+            elif args[1] == "id":
+                if len(args) <= 2:
+                    logger.error("id モードには video_id が必要です")
+                    sys.exit(1)
+                logger.info(f"mode: id ({args[2]}) で実行します")
+                fetch_captions(args[2], dbManager)
+
+            else:
+                logger.error("不正な引数です")
                 sys.exit(1)
-            logger.info(f"mode: id ({args[2]}) で実行します")
-            fetch_captions(args[2], dbManager)
-
-        else:
-            logger.error("不正な引数です")
-            sys.exit(1)
+    except Exception as e:
+        logger.exception(f"実行中に予期しないエラー: {e}")
+        notify_failure("youtube_summary_bot 異常終了", str(e))
+        sys.exit(1)
