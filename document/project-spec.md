@@ -109,22 +109,22 @@ youtube_summary_bot/
 ## 実行方法
 
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate
-uv pip install -r requirements.txt
+make setup
+# 依存関係を同期し直す場合
+make sync
 
 psql -U <user> -d <database> -f sql/create.sql
 # 既存 DB なら
 psql -U <user> -d <database> -f sql/migrate_2026_09_align_schema.sql
 
 # Step 1: 字幕
-PYTHONPATH=src python src/main.py latest
+PYTHONPATH=src .venv/bin/python src/main.py latest
 
 # Step 2: 要約（ホストに Codex ログイン済みであること）
-PYTHONPATH=src python src/main.py summarize
+PYTHONPATH=src .venv/bin/python src/main.py summarize
 
 # Step 3: Discord
-PYTHONPATH=src python src/bot/main.py
+PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
 ---

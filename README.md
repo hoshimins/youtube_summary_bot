@@ -19,7 +19,9 @@ YouTube 動画の字幕を自動取得し、AI（デフォルト: Codex CLI）�
 
 ## システム要件
 
-- Python 3.12 推奨
+- mise
+- uv（miseでリポジトリ単位に固定）
+- Python 3.12.14（miseでリポジトリ単位に固定）
 - PostgreSQL
 - YouTube Data API v3 キー（`all` / `id` モード時）
 - **要約用**: ホストにインストール済みの Codex CLI（推奨）または OpenAI / LM Studio
@@ -33,9 +35,9 @@ YouTube 動画の字幕を自動取得し、AI（デフォルト: Codex CLI）�
 git clone <repository-url>
 cd youtube_summary_bot
 
-uv venv --python 3.12
-source .venv/bin/activate
-uv pip install -r requirements.txt
+make setup
+# 依存関係を同期し直す場合
+make sync
 
 psql -U your_user -d your_database -f sql/create.sql
 # 既存 DB の場合
@@ -80,27 +82,27 @@ NTFY_URL=https://ntfy.example.com/youtube-summary-bot
 ## 使い方
 
 ```bash
-source .venv/bin/activate
+make setup  # 初回のみ
 ```
 
 ### Step 1: 字幕取得
 
 ```bash
-PYTHONPATH=src python src/main.py latest
-PYTHONPATH=src python src/main.py all
-PYTHONPATH=src python src/main.py id VIDEO_ID
+PYTHONPATH=src .venv/bin/python src/main.py latest
+PYTHONPATH=src .venv/bin/python src/main.py all
+PYTHONPATH=src .venv/bin/python src/main.py id VIDEO_ID
 ```
 
 ### Step 2: 要約生成（Codex 利用時はホストで実行）
 
 ```bash
-PYTHONPATH=src python src/main.py summarize
+PYTHONPATH=src .venv/bin/python src/main.py summarize
 ```
 
 ### Step 3: Discord 送信
 
 ```bash
-PYTHONPATH=src python src/bot/main.py
+PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
 ### シェルスクリプト（Step 1 + 2）

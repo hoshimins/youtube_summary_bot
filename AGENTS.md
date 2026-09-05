@@ -4,18 +4,18 @@ YouTube チャンネルを監視し、字幕 → AI 要約 → Discord Webhook �
 
 ## 必読（短い）
 
-- 実行はホストの `.venv` + `PYTHONPATH=src`。要約の既定はホストの Codex CLI（`SUMMARY_PROVIDER=codex`）。
+- `mise.toml`でPython 3.12.14とuv 0.11.24をリポジトリ単位に固定する。依存関係はuvで`.venv`へ同期し、実行はその`.venv` + `PYTHONPATH=src`。要約の既定はホストのCodex CLI（`SUMMARY_PROVIDER=codex`）。
 - コミットメッセージは日本語（`feature:` / `fix:` / `doc:` / `chore:` 等）。機能は `feature/<name>` → `develop` へ PR。
 - `.env` や秘密情報はコミットしない。
 
 ## コマンド
 
 ```bash
-source .venv/bin/activate
+make setup
 make test
 make run                 # latest（字幕）
 make run MODE=summarize  # 要約
-PYTHONPATH=src python src/bot/main.py
+PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
 cron 用: `src/script/get_summary_latest.sh`（latest→summarize）、`src/script/send_message.sh`。
@@ -37,4 +37,4 @@ cron 用: `src/script/get_summary_latest.sh`（latest→summarize）、`src/scri
 
 - Discord は 1 実行 1 動画。送信が全チャンク成功したときだけ `summary_send_flag` を更新する。
 - 失敗通知は `NTFY_URL`（任意）。未設定なら通知しない。
-- アプリ本体はDocker化せず、ホストのvenv＋cronで動かす。PostgreSQLのみ `deploy/postgres/` の専用コンテナを使う。
+- アプリ本体はDocker化せず、mise/uvで管理した`.venv`＋cronで動かす。PostgreSQLのみ `deploy/postgres/` の専用コンテナを使う。
