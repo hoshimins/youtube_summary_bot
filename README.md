@@ -153,7 +153,7 @@ docker run --env-file .env youtube-summary-bot
 - 字幕言語が無い動画はスキップされ、`caption_unavailable` が立ちます
 - Discord はレート制限対策で 1 実行 1 動画です。送信失敗時はフラグを更新しません
 - `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件までに制限されます
-- `channel` は 1 件想定です（マルチチャンネル未対応）
+- `channel` は複数登録可能。`latest` / `all` は全件を順に処理します
 
 ## Makefile
 

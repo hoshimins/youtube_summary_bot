@@ -85,32 +85,35 @@ def get_data(mode, dbManager):
     """指定されたモードによって動画情報を取得する"""
 
     if mode == "latest":
-        channel_id, channel_name = dbManager.get_channel_data()
-        RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-        new_data = fetch_rss_feed.get_latest_videos(RSS_URL)
-        db_data = dbManager.get_db_data(channel_id)
-        new_data = comparison_data.compare_data(db_data, new_data)
+        for channel_id, channel_name in dbManager.get_all_channels():
+            logger.info(f"チャンネル処理中: {channel_name} ({channel_id})")
+            RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+            new_data = fetch_rss_feed.get_latest_videos(RSS_URL)
+            db_data = dbManager.get_db_data(channel_id)
+            new_data = comparison_data.compare_data(db_data, new_data)
 
-        if not new_data:
-            logger.info("新しい動画はありません")
-            return
+            if not new_data:
+                logger.info(f"新しい動画はありません: {channel_name}")
+                continue
 
-        logger.info(f"新しい動画は {len(new_data)} 件です")
-        dbManager.save_db_new_data(new_data, channel_id, channel_name)
+            logger.info(f"新しい動画は {len(new_data)} 件です: {channel_name}")
+            dbManager.save_db_new_data(new_data, channel_id, channel_name)
 
     elif mode == "all":
-        channel_id, channel_name = dbManager.get_channel_data()
         youtube_fetcher = YoutubeFetcher()
-        new_data = youtube_fetcher.fetch_all_videos(channel_id)
-        dbManager.save_db_new_data(new_data, channel_id, channel_name)
+        for channel_id, channel_name in dbManager.get_all_channels():
+            logger.info(f"チャンネル全動画取得: {channel_name} ({channel_id})")
+            new_data = youtube_fetcher.fetch_all_videos(channel_id)
+            dbManager.save_db_new_data(new_data, channel_id, channel_name)
 
     else:
-        channel_id, channel_name = dbManager.get_channel_data()
         youtube_fetcher = YoutubeFetcher()
         new_data = youtube_fetcher.get_video_info(mode)
         if not new_data or not new_data.get("video_id"):
             logger.error(f"動画情報を取得できませんでした: {mode}")
             return
+        channel_id = new_data["channel_id"]
+        channel_name = new_data["channel_name"]
         dbManager.save_db_new_data([new_data], channel_id, channel_name)
 
 

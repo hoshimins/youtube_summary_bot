@@ -55,14 +55,20 @@ class DatabaseManager:
             self.connection.rollback()
             raise
 
-    def get_channel_data(self):
+    def get_all_channels(self):
+        """登録済みチャンネルを全件取得する。"""
         self.cursor.execute(
-            "SELECT * FROM youtube_feed_summary.channel LIMIT 1")
-        row = self.cursor.fetchall()
+            "SELECT channel_id, channel_name FROM youtube_feed_summary.channel "
+            "ORDER BY created_at ASC, channel_id ASC"
+        )
+        rows = self.cursor.fetchall()
+        if not rows:
+            raise ValueError("channelテーブルにデータが存在しません")
+        return [(row[0], row[1]) for row in rows]
 
-        if row:
-            return row[0][0], row[0][1]
-        raise ValueError("channelテーブルにデータが存在しません")
+    def get_channel_data(self):
+        """先頭チャンネルを返す（後方互換）。"""
+        return self.get_all_channels()[0]
 
     def get_not_send_summaries_data(self):
         self.cursor.execute(
