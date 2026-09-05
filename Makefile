@@ -1,6 +1,6 @@
 # Makefile
 
-.PHONY: setup sync audit channel-list run help test
+.PHONY: setup sync audit channel-list sync-videos captions run help test
 
 MODE ?= latest
 AUDIT_SOURCE ?= api
@@ -10,12 +10,14 @@ PYTHON ?= .venv/bin/python
 UV ?= mise exec -- uv
 
 help:
-	@echo "Usage: make setup|sync|audit|run|test"
+	@echo "Usage: make setup|sync|sync-videos|captions|audit|run|test"
 	@echo "  make setup       miseでPython/uvを準備し、依存関係を同期"
 	@echo "  make sync        requirements.txtを.venvへ同期"
 	@echo "  make audit       YouTubeとDBの動画差分を確認（AUDIT_SOURCE=rss可）"
 	@echo "  make channel-list 登録チャンネルを表示"
-	@echo "  make run         latest（MODE=latest|all|summarize|id）"
+	@echo "  make sync-videos YouTube動画メタデータだけをDBへ同期"
+	@echo "  make captions    DB登録済み動画の字幕だけを取得"
+	@echo "  make run         任意のMODEを実行（legacy含む）"
 	@echo "  make test        ローカル単体テスト"
 	@echo "  例: make run MODE=summarize"
 
@@ -32,6 +34,12 @@ audit:
 
 channel-list:
 	@PYTHONPATH=src $(PYTHON) src/script/manage_channels.py list
+
+sync-videos:
+	@PYTHONPATH=src $(PYTHON) src/main.py sync
+
+captions:
+	@PYTHONPATH=src $(PYTHON) src/main.py captions
 
 run:
 	@echo "Running with mode: $(MODE)"

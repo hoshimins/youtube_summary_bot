@@ -118,6 +118,19 @@ class DatabaseManager:
             self.connection.rollback()
             raise
 
+    def get_video_ids(self, channel_id):
+        """指定チャンネルのDB登録済み動画IDを返す。"""
+        try:
+            self.cursor.execute(
+                "SELECT video_id FROM youtube_feed_summary.video WHERE channel_id = %s",
+                (channel_id,),
+            )
+            return {row[0] for row in self.cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"動画ID取得エラー: {e}")
+            self.connection.rollback()
+            raise
+
     def get_channel_video_audit_data(self, channel_id):
         """監査用に動画と字幕・要約の状態をまとめて取得する。"""
         try:

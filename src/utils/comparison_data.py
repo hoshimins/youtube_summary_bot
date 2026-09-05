@@ -1,4 +1,13 @@
 
+def filter_new_videos(db_video_ids, remote_videos):
+    """DBに存在しない動画だけを動画IDで抽出する。"""
+    known_ids = set(db_video_ids)
+    return [
+        video
+        for video in remote_videos
+        if video.get("video_id") not in known_ids
+    ]
+
 def compare_data(db_data, new_data):
     """2つのデータセットを比較し、新しいデータを抽出する関数"""
     formatted_db_data, formatted_new_data = format_data(db_data, new_data)

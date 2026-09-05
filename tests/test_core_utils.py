@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from utils.caption_text import prepare_caption_for_storage  # noqa: E402
-from utils.comparison_data import compare_data  # noqa: E402
+from utils.comparison_data import compare_data, filter_new_videos  # noqa: E402
 from utils.notify import notify_failure  # noqa: E402
 
 
@@ -22,6 +22,14 @@ class CaptionTextTests(unittest.TestCase):
 
 
 class ComparisonDataTests(unittest.TestCase):
+    def test_filters_new_videos_by_id(self):
+        remote_videos = [
+            {"video_id": "old", "title": "Changed title"},
+            {"video_id": "new", "title": "New"},
+        ]
+        result = filter_new_videos({"old"}, remote_videos)
+        self.assertEqual([video["video_id"] for video in result], ["new"])
+
     def test_returns_only_new_videos(self):
         db_data = [
             ("old1", "Old", "ch", "2024-01-01", "https://example.com/old1", False),

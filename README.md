@@ -4,14 +4,14 @@ YouTube 動画の字幕を自動取得し、AI（デフォルト: Codex CLI）�
 
 ## 概要
 
-1. YouTube チャンネルの RSS（または Data API）から動画を監視
+1. YouTube Data API から動画メタデータを同期
 2. 字幕を取得して PostgreSQL に保存（長文は文字数制限で切り詰め）
 3. ホスト上の Codex CLI（または OpenAI / LM Studio）で要約
 4. Discord Webhook で投稿（1 実行 1 件）
 
 ## 主要機能
 
-- RSS / YouTube Data API による動画取得
+- YouTube Data API による動画メタデータ同期
 - `youtube-transcript-api` による字幕取得（言語は `CAPTION_LANGUAGES`）
 - 字幕取得不可フラグ（`caption_unavailable`）
 - 要約プロバイダー切替: `codex` / `openai` / `lmstudio`
@@ -23,7 +23,7 @@ YouTube 動画の字幕を自動取得し、AI（デフォルト: Codex CLI）�
 - uv（miseでリポジトリ単位に固定）
 - Python 3.12.14（miseでリポジトリ単位に固定）
 - PostgreSQL
-- YouTube Data API v3 キー（`all` / `audit` / `id` / チャンネル名自動取得時）
+- YouTube Data API v3 キー（`sync` / `all` / `audit` / `id` / チャンネル名自動取得時）
 - **要約用**: ホストにインストール済みの Codex CLI（推奨）または OpenAI / LM Studio
 - Discord Webhook URL
 
@@ -85,27 +85,45 @@ NTFY_URL=https://ntfy.example.com/youtube-summary-bot
 make setup  # 初回のみ
 ```
 
-### Step 1: 字幕取得
+### Step 1: 動画メタデータ同期
+
+DBとYouTubeの公開動画を揃える処理です。動画の登録だけを行い、字幕や要約は作りません。
 
 ```bash
-PYTHONPATH=src .venv/bin/python src/main.py latest
-PYTHONPATH=src .venv/bin/python src/main.py all
+make sync-videos
+# 直接実行する場合
+PYTHONPATH=src .venv/bin/python src/main.py sync
+```
+
+### Step 2: 字幕取得
+
+DBに登録済みで字幕未取得の動画だけを処理します。
+
+```bash
+make captions
+# 直接実行する場合
+PYTHONPATH=src .venv/bin/python src/main.py captions
+```
+
+個別動画の登録・字幕取得（従来互換）:
+
+```bash
 PYTHONPATH=src .venv/bin/python src/main.py id VIDEO_ID
 ```
 
-### Step 2: 要約生成（Codex 利用時はホストで実行）
+### Step 3: 要約生成（Codex 利用時はホストで実行）
 
 ```bash
 PYTHONPATH=src .venv/bin/python src/main.py summarize
 ```
 
-### Step 3: Discord 送信
+### Step 4: Discord 送信
 
 ```bash
 PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
-### シェルスクリプト（Step 1 + 2）
+### シェルスクリプト（Step 1〜3）
 
 ```bash
 ./src/script/get_summary_latest.sh
@@ -130,7 +148,7 @@ make audit AUDIT_LIMIT=50
 make audit AUDIT_FORMAT=json
 ```
 
-API 全件監査では、未取得候補（YouTube に存在するが DB にない動画）と、DB にあるが YouTube から確認できない動画を分けて表示します。AUDIT_LIMIT を指定した場合、比較範囲外の古い DB 動画は削除扱いにしません。RSS 監査では公開動画総数や全期間の差分は判定できません。
+API 全件監査では、未取得候補（YouTube に存在するが DB にない動画）と、DB にあるが YouTube から確認できない動画を分けて表示します。AUDIT_LIMIT を指定した場合、比較範囲外の古い DB 動画は削除扱いにしません。RSS は通知購読用の仕様として残っていますが、通常の一覧ポーリングには使わず、監査の診断用に限定しています。
 
 監視チャンネルは DB に明示的に登録できます。add は同じチャンネル ID なら表示名を更新するだけで、動画データを削除しません。
 
@@ -173,7 +191,7 @@ docker compose --env-file .env -f compose.yml up -d
 | ライブラリ | 用途 |
 |-----------|------|
 | requests | Discord Webhook HTTP 送信 |
-| feedparser | RSS |
+| feedparser | RSS診断用 |
 | google-api-python-client | YouTube Data API |
 | openai | OpenAI / LM Studio 互換 API |
 | psycopg2-binary | PostgreSQL |
@@ -182,9 +200,10 @@ docker compose --env-file .env -f compose.yml up -d
 
 ## 処理フロー
 
-1. `latest`: 新着検出 → 字幕保存（必要なら切り詰め）
-2. `summarize`: 未要約を Codex 等で生成
-3. `bot/main.py`: 未送信 1 件を Discord へ
+1. `sync`: YouTube公開動画のメタデータをDBへ同期
+2. `captions`: DB登録済み動画の字幕を取得
+3. `summarize`: 字幕済み・未要約を Codex 等で生成
+4. `bot/main.py`: 未送信 1 件を Discord へ
 
 詳細は [AGENTS.md](./AGENTS.md)（エージェント向け要約）と [document/project-spec.md](./document/project-spec.md)、`document/` を参照。
 
@@ -194,20 +213,20 @@ docker compose --env-file .env -f compose.yml up -d
 - 字幕言語が無い動画はスキップされ、`caption_unavailable` が立ちます
 - Discord はレート制限対策で 1 実行 1 動画です。送信失敗時はフラグを更新しません
 - `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件までに制限されます
-- `channel` は複数登録可能。`latest` / `all` は全件を順に処理します
+- `channel` は複数登録可能。`sync` / 互換モードの `latest`・`all` は全チャンネルを順に処理します
 
 ## Makefile
 
 ```bash
-make run              # latest
-make run MODE=all
+make sync-videos      # 動画メタデータだけ同期
+make captions         # 字幕だけ取得
 make run MODE=summarize
 make test             # ローカル単体テスト（GitHub Actions なし）
 ```
 
 ## 今後の拡張案
 
-- 監査結果に基づく自動バックフィル
+- 監査結果の通知・定期レポート
 - Discord Bot 化
 - 要約プロバイダーの自動フェイルオーバー
 - 失敗時の ntfy 等通知

@@ -15,22 +15,26 @@ YouTube チャンネルの最新動画を監視し、字幕を取得して AI �
 ```
 cron
  ├─ get_summary_latest.sh
- │    ├─ src/main.py latest     (RSS監視 → 字幕取得 → DB 保存)
+ │    ├─ src/main.py sync       (YouTube API → 動画メタデータをDBへ同期)
+ │    ├─ src/main.py captions   (DB登録済み動画の字幕取得)
  │    └─ src/main.py summarize  (字幕済み・未要約を Codex 等で要約)
  └─ send_message.sh → src/bot/main.py  (未送信要約を Discord に投稿・1実行1件)
 ```
 
-### データフロー（main.py latest / all / id）
+### データフロー（main.py sync）
 
 1. DB の `channel` テーブルからチャンネルIDを取得（複数チャンネルを順次）
-2. モードに応じて動画一覧を取得
-   - `latest`: RSS
-   - `all` / `id`: YouTube Data API v3
-3. 新着を `video` / `captions` / `summary` に挿入（caption・summary は NULL）
-4. `caption IS NULL` かつ `caption_unavailable = FALSE` を処理
-   - `youtube-transcript-api` で字幕取得（`CAPTION_LANGUAGES`）
-   - 長すぎる字幕は `CAPTION_MAX_CHARS` で切り詰めてから DB 保存
-   - 取得不可は `caption_unavailable = TRUE`
+2. YouTube Data API v3 の uploads playlist から公開動画を取得
+3. DBにない動画だけを `video` / `captions` / `summary` に挿入（caption・summary は NULL）
+
+### データフロー（main.py captions）
+
+1. DBに登録済みで `caption IS NULL` かつ `caption_unavailable = FALSE` の動画を取得
+2. `youtube-transcript-api` で字幕取得（`CAPTION_LANGUAGES`）
+3. 長すぎる字幕は `CAPTION_MAX_CHARS` で切り詰めてDB保存
+4. 取得不可は `caption_unavailable = TRUE`
+
+`id` モードは従来互換として、指定動画のメタデータを登録した後、未取得字幕を処理する。
 
 ### データフロー（main.py summarize）
 
@@ -53,7 +57,7 @@ cron
 ```
 youtube_summary_bot/
 ├── src/
-│   ├── main.py                      # latest|all|id|summarize
+│   ├── main.py                      # sync|captions|latest|all|id|summarize
 │   ├── classes/
 │   │   ├── database_manager.py
 │   │   ├── youtube_fetcher.py
@@ -88,7 +92,7 @@ youtube_summary_bot/
 | 変数名 | 説明 |
 |--------|------|
 | `DATABASE_URL` | PostgreSQL 接続文字列 |
-| `YOUTUBE_API_KEY` | YouTube Data API v3（`all` / `audit` / `id` / チャンネル名自動取得で必要） |
+| `YOUTUBE_API_KEY` | YouTube Data API v3（`sync` / `all` / `audit` / `id` / チャンネル名自動取得で必要） |
 | `SUMMARY_PROVIDER` | `codex`（既定）/ `openai` / `lmstudio` |
 | `CODEX_BIN` | Codex 実行ファイル（既定: `codex`） |
 | `CODEX_MODEL` | 任意。Codex の `-m` |
@@ -117,13 +121,16 @@ psql -U <user> -d <database> -f sql/create.sql
 # 既存 DB なら
 psql -U <user> -d <database> -f sql/migrate_2026_09_align_schema.sql
 
-# Step 1: 字幕
-PYTHONPATH=src .venv/bin/python src/main.py latest
+# Step 1: 動画メタデータ同期
+make sync-videos
 
-# Step 2: 要約（ホストに Codex ログイン済みであること）
+# Step 2: 字幕
+make captions
+
+# Step 3: 要約（ホストに Codex ログイン済みであること）
 PYTHONPATH=src .venv/bin/python src/main.py summarize
 
-# Step 3: Discord
+# Step 4: Discord
 PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
@@ -142,7 +149,8 @@ PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UC... "チャ�
 ```
 
 API 全件監査では、YouTubeにありDBにない未取得候補、DBにあるがYouTubeから確認できない動画、字幕・要約・Discord送信の処理状況を出力する。RSS は最新フィードだけの限定比較で、公開動画総数は取得できない。
----
+
+同期と要約は分離されている。`sync-videos` は動画メタデータだけをDBへ登録し、`captions` は字幕だけ、`summarize` は要約だけを処理する。
 
 ## DB スキーマ概要
 
@@ -175,8 +183,8 @@ API 全件監査では、YouTubeにありDBにない未取得候補、DBにあ�
 ## 既知の制限事項・注意点
 
 - 指定言語の字幕がない動画は `caption_unavailable` になりスキップされる
-- チャンネルは複数登録可。`latest` / `all` は全チャンネルを順に処理する
-- `all` モードは YouTube API クォータを大量消費する
+- チャンネルは複数登録可。`sync` / 互換モードの `latest`・`all` は全チャンネルを順に処理する
+- `sync` は YouTube API の uploads playlist を全件確認するため、チャンネル数に応じて API クォータを消費する
 - Discord は **1 実行につき 1 動画**。送信が全チャンク成功したときだけ `summary_send_flag` を更新
 - `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件まで
 - Codex 要約はホストの `codex` と認証が必要
