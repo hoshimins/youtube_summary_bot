@@ -132,7 +132,7 @@ PYTHONPATH=src python src/bot/main.py
 
 | テーブル | 主キー | 説明 |
 |---------|--------|------|
-| `channel` | `channel_id` | 監視対象。現状 1 件想定 |
+| `channel` | `channel_id` | 監視対象チャンネル（複数可） |
 | `video` | `video_id` | `summary_send_flag` で Discord 送信管理。`title` は TEXT |
 | `captions` | `video_id` | 字幕。`caption_unavailable` で取得不可を記録 |
 | `summary` | `video_id` | 要約。NULL = 未生成 |
@@ -157,7 +157,7 @@ PYTHONPATH=src python src/bot/main.py
 ## 既知の制限事項・注意点
 
 - 指定言語の字幕がない動画は `caption_unavailable` になりスキップされる
-- チャンネルは `LIMIT 1`（マルチチャンネル未対応）
+- チャンネルは複数登録可。`latest` / `all` は全チャンネルを順に処理する
 - `all` モードは YouTube API クォータを大量消費する
 - Discord は **1 実行につき 1 動画**。送信が全チャンク成功したときだけ `summary_send_flag` を更新
 - `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件まで
