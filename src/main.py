@@ -27,28 +27,29 @@ def fetch_captions(mode, dbManager):
     no_caption_video_id = [record[0] for record in no_caption_record]
     sleep_interval = int(os.getenv("CAPTION_SLEEP_INTERVAL", "30"))
 
-    for video_id in no_caption_video_id:
+    for index, video_id in enumerate(no_caption_video_id):
         try:
             caption_txt = get_caption.get_caption(video_id)
         except (IpBlocked, RequestBlocked):
             logger.error("YouTube に IP ブロックされています。時間をおいてから再実行してください。")
             break
-        time.sleep(sleep_interval)
+
         if caption_txt is None:
             logger.warning(f"字幕が取得できなかったためスキップします: {video_id}")
             dbManager.mark_caption_unavailable(video_id)
-            continue
+        else:
+            caption_txt = prepare_caption_for_storage(caption_txt)
+            if not caption_txt:
+                logger.warning(f"字幕が空のためスキップします: {video_id}")
+                dbManager.mark_caption_unavailable(video_id)
+            else:
+                dbManager.save_caption_data(video_id, caption_txt)
+                logger.info(
+                    f"キャプションデータを保存しました: {video_id} ({len(caption_txt)} 文字)"
+                )
 
-        caption_txt = prepare_caption_for_storage(caption_txt)
-        if not caption_txt:
-            logger.warning(f"字幕が空のためスキップします: {video_id}")
-            dbManager.mark_caption_unavailable(video_id)
-            continue
-
-        dbManager.save_caption_data(video_id, caption_txt)
-        logger.info(
-            f"キャプションデータを保存しました: {video_id} ({len(caption_txt)} 文字)"
-        )
+        if index < len(no_caption_video_id) - 1:
+            time.sleep(sleep_interval)
 
 
 def generate_summaries(dbManager):
@@ -107,6 +108,9 @@ def get_data(mode, dbManager):
         channel_id, channel_name = dbManager.get_channel_data()
         youtube_fetcher = YoutubeFetcher()
         new_data = youtube_fetcher.get_video_info(mode)
+        if not new_data or not new_data.get("video_id"):
+            logger.error(f"動画情報を取得できませんでした: {mode}")
+            return
         dbManager.save_db_new_data([new_data], channel_id, channel_name)
 
 
@@ -117,23 +121,22 @@ if __name__ == '__main__':
         sys.exit(1)
 
     load_env()
-    dbManager = DatabaseManager()
+    with DatabaseManager() as dbManager:
+        if args[1] == "summarize":
+            logger.info("mode: summarize で実行します")
+            generate_summaries(dbManager)
 
-    if args[1] == "summarize":
-        logger.info("mode: summarize で実行します")
-        generate_summaries(dbManager)
+        elif args[1] in ("all", "latest"):
+            logger.info(f"mode: {args[1]} で実行します")
+            fetch_captions(args[1], dbManager)
 
-    elif args[1] in ("all", "latest"):
-        logger.info(f"mode: {args[1]} で実行します")
-        fetch_captions(args[1], dbManager)
+        elif args[1] == "id":
+            if len(args) <= 2:
+                logger.error("id モードには video_id が必要です")
+                sys.exit(1)
+            logger.info(f"mode: id ({args[2]}) で実行します")
+            fetch_captions(args[2], dbManager)
 
-    elif args[1] == "id":
-        if len(args) <= 2:
-            logger.error("id モードには video_id が必要です")
+        else:
+            logger.error("不正な引数です")
             sys.exit(1)
-        logger.info(f"mode: id ({args[2]}) で実行します")
-        fetch_captions(args[2], dbManager)
-
-    else:
-        logger.error("不正な引数です")
-        sys.exit(1)
