@@ -1,22 +1,49 @@
 # Makefile
 
-.PHONY: run help test
+.PHONY: setup sync audit channel-list sync-videos captions run help test
 
-# default mode is 'latest' if not specified
 MODE ?= latest
+AUDIT_SOURCE ?= api
+AUDIT_LIMIT ?= 0
+AUDIT_FORMAT ?= text
+PYTHON ?= .venv/bin/python
+UV ?= mise exec -- uv
 
 help:
-	@echo "Usage: make run MODE=latest|all|summarize|id"
-	@echo "  MODE=latest     RSS 監視 + 字幕取得（デフォルト）"
-	@echo "  MODE=all        全動画取得 + 字幕取得"
-	@echo "  MODE=summarize  未要約を要約"
-	@echo "  make test       ローカル単体テスト"
+	@echo "Usage: make setup|sync|sync-videos|captions|audit|run|test"
+	@echo "  make setup       miseでPython/uvを準備し、依存関係を同期"
+	@echo "  make sync        requirements.txtを.venvへ同期"
+	@echo "  make audit       YouTubeとDBの動画差分を確認（AUDIT_SOURCE=rss可）"
+	@echo "  make channel-list 登録チャンネルを表示"
+	@echo "  make sync-videos YouTube動画メタデータだけをDBへ同期"
+	@echo "  make captions    DB登録済み動画の字幕だけを取得"
+	@echo "  make run         任意のMODEを実行（legacy含む）"
+	@echo "  make test        ローカル単体テスト"
 	@echo "  例: make run MODE=summarize"
 
-# 実行
+setup:
+	@mise install
+	@$(UV) venv --python 3.12.14
+	@$(UV) pip sync --python $(PYTHON) requirements.txt
+
+sync:
+	@$(UV) pip sync --python $(PYTHON) requirements.txt
+
+audit:
+	@PYTHONPATH=src $(PYTHON) src/script/audit_channels.py --source $(AUDIT_SOURCE) --limit $(AUDIT_LIMIT) --format $(AUDIT_FORMAT) $(if $(CHANNEL_ID),--channel-id $(CHANNEL_ID),)
+
+channel-list:
+	@PYTHONPATH=src $(PYTHON) src/script/manage_channels.py list
+
+sync-videos:
+	@PYTHONPATH=src $(PYTHON) src/main.py sync
+
+captions:
+	@PYTHONPATH=src $(PYTHON) src/main.py captions
+
 run:
-	@echo "Activating venv and running with mode: $(MODE)"
-	@. .venv/bin/activate && PYTHONPATH=src python3 src/main.py $(MODE)
+	@echo "Running with mode: $(MODE)"
+	@PYTHONPATH=src $(PYTHON) src/main.py $(MODE)
 
 test:
-	@. .venv/bin/activate && PYTHONPATH=src python3 -m unittest discover -s tests -v
+	@PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v

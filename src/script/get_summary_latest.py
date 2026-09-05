@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""latest → summarize を連続実行する薄いラッパー。"""
+"""動画メタデータ同期 → 字幕取得 → 要約を連続実行する薄いラッパー。"""
 import os
 import subprocess
 import sys
@@ -19,5 +19,6 @@ def _run(mode: str) -> None:
 
 
 if __name__ == "__main__":
-    _run("latest")
+    _run("sync")
+    _run("captions")
     _run("summarize")

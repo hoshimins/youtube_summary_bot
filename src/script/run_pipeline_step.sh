@@ -1,5 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+MODE="${1:?mode is required: sync|captions|summarize}"
+case "$MODE" in
+  sync|captions|summarize) ;;
+  *) echo "unsupported mode: $MODE" >&2; exit 2 ;;
+esac
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
@@ -9,6 +14,4 @@ set -a
 source .env
 set +a
 export PYTHONPATH="$PROJECT_ROOT/src"
-python src/main.py sync
-python src/main.py captions
-python src/main.py summarize
+exec python src/main.py "$MODE"

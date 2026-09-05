@@ -36,35 +36,58 @@ class DatabaseManager:
         self.close()
 
     def _check_db_channel_table(self, channel_id, channel_name):
-        """チャンネルテーブルの確認&チャンネルテーブルにデータがない場合は挿入"""
+        """動画保存時の後方互換用。チャンネルを登録・更新する。"""
+        self.add_channel(channel_id, channel_name)
+
+    def list_channels(self):
+        """登録済みチャンネルを辞書のリストで返す。空でも例外にしない。"""
+        self.cursor.execute(
+            "SELECT channel_id, channel_name, created_at "
+            "FROM youtube_feed_summary.channel "
+            "ORDER BY created_at ASC, channel_id ASC"
+        )
+        rows = self.cursor.fetchall()
+        return [
+            {
+                "channel_id": row[0],
+                "channel_name": row[1],
+                "created_at": str(row[2]) if row[2] is not None else None,
+            }
+            for row in rows
+        ]
+
+    def add_channel(self, channel_id, channel_name):
+        """チャンネルを登録する。既存IDなら表示名を更新する。"""
+        channel_id = (channel_id or "").strip()
+        channel_name = (channel_name or "").strip()
+        if not channel_id:
+            raise ValueError("channel_id は必須です")
+        if not channel_name:
+            raise ValueError("channel_name は必須です")
+
         try:
             self.cursor.execute(
-                "SELECT * FROM youtube_feed_summary.channel WHERE channel_id = %s", (channel_id,))
-            rows = self.cursor.fetchall()
-
-            if not rows:
-                self.cursor.execute(
-                    "INSERT INTO youtube_feed_summary.channel (channel_id, channel_name) VALUES (%s, %s)", (channel_id, channel_name))
-                self.connection.commit()
-                logger.info(f"channel_id: {channel_id} を channel テーブルに挿入しました")
-            else:
-                logger.info(f"Channel ID {channel_id} already exists in the table.")
-
+                """
+                INSERT INTO youtube_feed_summary.channel (channel_id, channel_name)
+                VALUES (%s, %s)
+                ON CONFLICT (channel_id) DO UPDATE
+                SET channel_name = EXCLUDED.channel_name
+                """,
+                (channel_id, channel_name),
+            )
+            self.connection.commit()
+            logger.info(f"channel_id: {channel_id} を登録・更新しました")
         except Exception as e:
-            logger.error(f"チャンネルテーブル確認エラー: {e}")
+            logger.error(f"チャンネル登録エラー: {e}")
             self.connection.rollback()
             raise
 
     def get_all_channels(self):
         """登録済みチャンネルを全件取得する。"""
-        self.cursor.execute(
-            "SELECT channel_id, channel_name FROM youtube_feed_summary.channel "
-            "ORDER BY created_at ASC, channel_id ASC"
-        )
-        rows = self.cursor.fetchall()
-        if not rows:
+        channels = self.list_channels()
+        if not channels:
             raise ValueError("channelテーブルにデータが存在しません")
-        return [(row[0], row[1]) for row in rows]
+        return [(channel["channel_id"], channel["channel_name"]) for channel in channels]
 
     def get_channel_data(self):
         """先頭チャンネルを返す（後方互換）。"""
@@ -92,6 +115,62 @@ class DatabaseManager:
             return self.cursor.fetchall()
         except Exception as e:
             logger.error(f"動画データ取得エラー: {e}")
+            self.connection.rollback()
+            raise
+
+    def get_video_ids(self, channel_id):
+        """指定チャンネルのDB登録済み動画IDを返す。"""
+        try:
+            self.cursor.execute(
+                "SELECT video_id FROM youtube_feed_summary.video WHERE channel_id = %s",
+                (channel_id,),
+            )
+            return {row[0] for row in self.cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"動画ID取得エラー: {e}")
+            self.connection.rollback()
+            raise
+
+    def get_channel_video_audit_data(self, channel_id):
+        """監査用に動画と字幕・要約の状態をまとめて取得する。"""
+        try:
+            self.cursor.execute(
+                """
+                SELECT
+                    v.video_id,
+                    v.title,
+                    v.published,
+                    v.link,
+                    cp.caption,
+                    cp.caption_unavailable,
+                    s.summary,
+                    v.summary_send_flag
+                FROM youtube_feed_summary.video v
+                LEFT JOIN youtube_feed_summary.captions cp
+                    ON cp.video_id = v.video_id
+                LEFT JOIN youtube_feed_summary.summary s
+                    ON s.video_id = v.video_id
+                WHERE v.channel_id = %s
+                ORDER BY v.published DESC, v.video_id ASC
+                """,
+                (channel_id,),
+            )
+            rows = self.cursor.fetchall()
+            return [
+                {
+                    "video_id": row[0],
+                    "title": row[1],
+                    "published": str(row[2]) if row[2] is not None else None,
+                    "link": row[3],
+                    "caption": row[4],
+                    "caption_unavailable": bool(row[5]),
+                    "summary": row[6],
+                    "summary_send_flag": bool(row[7]),
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            logger.error(f"動画監査データ取得エラー: {e}")
             self.connection.rollback()
             raise
 

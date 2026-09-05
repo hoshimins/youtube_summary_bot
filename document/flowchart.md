@@ -1,23 +1,30 @@
 # 動画要約のフロー図
 
-## 最新動画: 字幕取得（latest）
+## 動画メタデータ同期（sync）
 
 ```mermaid
 graph TD
-Cron["Crontab get_summary_latest.sh"] -->|latest| Main["main.py"]
-Main --> DB["DatabaseManager get_db_data"]
-DB --> RSS["fetch_rss_feed get_latest_videos"]
-RSS --> compare{"compare_data"}
+CronSync["Crontab run_pipeline_step.sh sync"] --> MainSync["main.py sync"]
+MainSync --> YF["YoutubeFetcher.fetch_all_videos"]
+YF --> API["YouTube Data API"]
+MainSync --> IDs["DB video IDs"]
+IDs --> Compare["ID差分"]
+Compare -->|未登録のみ| Save["save_db_new_data"]
+Save --> EndSync["終了"]
+```
 
-compare -->|差分あり| SaveNew["save_db_new_data"]
-SaveNew --> NoCap["get_none_caption_record"]
-NoCap --> Cap["get_caption"]
+## 字幕取得（captions）
+
+```mermaid
+graph TD
+CronCaptions["Crontab run_pipeline_step.sh captions"] --> MainCaptions["main.py captions"]
+MainCaptions --> Rows["get_none_caption_record"]
+Rows --> Cap["get_caption"]
 Cap -->|成功| Prep["prepare_caption_for_storage"]
 Prep --> SaveCap["save_caption_data"]
 Cap -->|失敗| Mark["mark_caption_unavailable"]
-SaveCap --> End["終了 / 続けて summarize"]
-Mark --> End
-compare -->|差分なし| End
+SaveCap --> EndCaptions["終了"]
+Mark --> EndCaptions
 ```
 
 ## 要約生成（summarize）
