@@ -167,11 +167,11 @@ PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UCxxxxxxxxxxxx
 ## Cron 設定例
 
 ```cron
-# 毎時、各段階を10分ずつずらして実行。flockで重複起動を防止。
+# 同期・字幕・要約は毎時、Discord送信は毎日21:30（日本時間）。flockで重複起動を防止。
 0 * * * * /usr/bin/flock -n /tmp/youtube-summary-sync.lock /path/to/youtube_summary_bot/src/script/run_pipeline_step.sh sync >> /path/to/youtube_summary_bot/logs/sync.log 2>&1
 10 * * * * /usr/bin/flock -n /tmp/youtube-summary-captions.lock /path/to/youtube_summary_bot/src/script/run_pipeline_step.sh captions >> /path/to/youtube_summary_bot/logs/captions.log 2>&1
 20 * * * * /usr/bin/flock -n /tmp/youtube-summary-summarize.lock /path/to/youtube_summary_bot/src/script/run_pipeline_step.sh summarize >> /path/to/youtube_summary_bot/logs/summarize.log 2>&1
-30 * * * * /usr/bin/flock -n /tmp/youtube-summary-send.lock /path/to/youtube_summary_bot/src/script/send_message.sh >> /path/to/youtube_summary_bot/logs/send.log 2>&1
+30 21 * * * /usr/bin/flock -n /tmp/youtube-summary-send.lock /path/to/youtube_summary_bot/src/script/send_message.sh >> /path/to/youtube_summary_bot/logs/send.log 2>&1
 ```
 
 本番の定期実行はホスト上の mise/uv 管理 `.venv` + `src/script/*.sh` + cron を想定しています（Codex CLI もホスト実行）。
