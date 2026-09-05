@@ -74,7 +74,6 @@ youtube_summary_bot/
 │   ├── create.sql
 │   └── migrate_2026_09_align_schema.sql
 ├── document/
-├── Dockerfile                       # 主に字幕取得用（要約はホスト Codex 推奨）
 ├── Makefile
 ├── requirements.txt
 └── .env
@@ -163,7 +162,7 @@ PYTHONPATH=src python src/bot/main.py
 - `all` モードは YouTube API クォータを大量消費する
 - Discord は **1 実行につき 1 動画**。送信が全チャンク成功したときだけ `summary_send_flag` を更新
 - `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件まで
-- Codex 要約はホストの `codex` と認証が必要。Docker 内からの利用は想定外
+- Codex 要約はホストの `codex` と認証が必要
 - 長い字幕は `CAPTION_MAX_CHARS` で切り詰められる
 - 既存 DB は `sql/migrate_2026_09_align_schema.sql` の適用が必要な場合がある
 

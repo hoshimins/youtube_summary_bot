@@ -1,6 +1,0 @@
-.venv
-.env
-*.log
-__pycache__
-.git
-document

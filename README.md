@@ -117,22 +117,7 @@ PYTHONPATH=src python src/bot/main.py
 30 * * * * /path/to/youtube_summary_bot/src/script/send_message.sh >> /path/to/youtube_summary_bot/send.log 2>&1
 ```
 
-## Docker について
-
-`Dockerfile` は **字幕取得（`latest`）向けの参考イメージ**です。
-
-| 処理 | 推奨実行場所 |
-|------|----------------|
-| `latest` / `all` / `id` | ホストまたはコンテナ可 |
-| `summarize`（Codex） | **ホスト必須**（`codex` バイナリとログイン状態） |
-| Discord 送信 | ホスト推奨 |
-
-本番の定期実行は `src/script/*.sh` + cron を推奨します。
-
-```bash
-docker build -t youtube-summary-bot .
-docker run --env-file .env youtube-summary-bot
-```
+本番の定期実行はホスト上の venv + `src/script/*.sh` + cron を想定しています（Codex CLI もホスト実行）。
 
 ## 技術スタック
 
