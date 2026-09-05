@@ -52,13 +52,22 @@ def fetch_captions(mode, dbManager):
 
 
 def generate_summaries(dbManager):
-    """要約生成（LM Studio 依存）"""
+    """要約生成（SUMMARY_PROVIDER: codex / openai / lmstudio）"""
     no_summary_record = dbManager.get_none_summary_record()
     if not no_summary_record:
         logger.info("要約が未生成のレコードはありません")
         return
 
-    logger.info(f"要約未生成の動画: {len(no_summary_record)} 件")
+    batch_limit = int(os.getenv("SUMMARIZE_BATCH_LIMIT", "3"))
+    if batch_limit > 0:
+        total = len(no_summary_record)
+        no_summary_record = no_summary_record[:batch_limit]
+        logger.info(
+            f"要約未生成の動画: {total} 件中 {len(no_summary_record)} 件を処理 "
+            f"(SUMMARIZE_BATCH_LIMIT={batch_limit})"
+        )
+    else:
+        logger.info(f"要約未生成の動画: {len(no_summary_record)} 件（上限なし）")
 
     for video_id, caption_txt in no_summary_record:
         try:
