@@ -13,13 +13,16 @@ classDiagram
         <<service>>
         - webhook_url : str
         + get_summary()
-        - _send_summary_message(data)
+        - _send_summary_message(data) bool
     }
 
     class DatabaseManager {
         - connection
         - cursor
         - db_url : str
+        + __enter__()
+        + __exit__()
+        + close()
         + get_channel_data()
         + get_not_send_summaries_data()
         + update_summary_send_flag(video_id)
