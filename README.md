@@ -137,7 +137,7 @@ PYTHONPATH=src python src/bot/main.py
 2. `summarize`: 未要約を Codex 等で生成
 3. `bot/main.py`: 未送信 1 件を Discord へ
 
-詳細は [CLAUDE.md](./CLAUDE.md) と `document/` を参照。
+詳細は [AGENTS.md](./AGENTS.md)（エージェント向け要約）と [document/project-spec.md](./document/project-spec.md)、`document/` を参照。
 
 ## 注意事項
 
