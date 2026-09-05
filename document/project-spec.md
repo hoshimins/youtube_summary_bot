@@ -1,4 +1,6 @@
-# YouTube Summary Bot — プロジェクト仕様書
+# YouTube Summary Bot — 詳細仕様（参照用）
+
+エージェント向けの要約はリポジトリ直下の `AGENTS.md` を見る。ここでは詳細のみ載せる。
 
 ## プロジェクト概要
 
@@ -20,7 +22,7 @@ cron
 
 ### データフロー（main.py latest / all / id）
 
-1. DB の `channel` テーブルからチャンネルIDを取得（`LIMIT 1`）
+1. DB の `channel` テーブルからチャンネルIDを取得（複数チャンネルを順次）
 2. モードに応じて動画一覧を取得
    - `latest`: RSS
    - `all` / `id`: YouTube Data API v3
