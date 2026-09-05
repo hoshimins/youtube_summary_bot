@@ -74,7 +74,6 @@ youtube_summary_bot/
 │   ├── create.sql
 │   └── migrate_2026_09_align_schema.sql
 ├── document/
-├── Dockerfile                       # 主に字幕取得用（要約はホスト Codex 推奨）
 ├── Makefile
 ├── requirements.txt
 └── .env
