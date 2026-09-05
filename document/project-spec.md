@@ -14,11 +14,10 @@ YouTube チャンネルの最新動画を監視し、字幕を取得して AI �
 
 ```
 cron
- ├─ get_summary_latest.sh
- │    ├─ src/main.py sync       (YouTube API → 動画メタデータをDBへ同期)
- │    ├─ src/main.py captions   (DB登録済み動画の字幕取得)
- │    └─ src/main.py summarize  (字幕済み・未要約を Codex 等で要約)
- └─ send_message.sh → src/bot/main.py  (未送信要約を Discord に投稿・1実行1件)
+ ├─ run_pipeline_step.sh sync      → src/main.py sync       (動画メタデータ同期)
+ ├─ run_pipeline_step.sh captions  → src/main.py captions   (字幕取得)
+ ├─ run_pipeline_step.sh summarize → src/main.py summarize  (要約生成)
+ └─ send_message.sh → src/bot/main.py                    (未送信要約をDiscordへ投稿・1実行1件)
 ```
 
 ### データフロー（main.py sync）
@@ -73,6 +72,7 @@ youtube_summary_bot/
 │   ├── bot/main.py
 │   └── script/
 │       ├── get_summary_latest.sh
+│       ├── run_pipeline_step.sh
 │       ├── send_message.sh
 │       ├── get_summary_latest.py
 │       └── get_all_channel_video.py
@@ -189,6 +189,7 @@ API 全件監査では、YouTubeにありDBにない未取得候補、DBにあ�
 - `summarize` は `SUMMARIZE_BATCH_LIMIT`（既定 3）件まで
 - Codex 要約はホストの `codex` と認証が必要
 - 長い字幕は `CAPTION_MAX_CHARS` で切り詰められる
+- 字幕取得は `CAPTION_SLEEP_INTERVAL` の待機を挟むため、未処理件数が多い場合は複数回のcron実行にまたがる
 - 既存 DB は `sql/migrate_2026_09_align_schema.sql` の適用が必要な場合がある
 
 ---

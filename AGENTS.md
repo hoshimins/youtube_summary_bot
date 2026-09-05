@@ -22,7 +22,7 @@ PYTHONPATH=src .venv/bin/python src/script/manage_channels.py add UC... "名前"
 PYTHONPATH=src .venv/bin/python src/bot/main.py
 ```
 
-cron 用: `src/script/get_summary_latest.sh`（sync→captions→summarize）、`src/script/send_message.sh`。監査は `src/script/audit_channels.py`、チャンネル登録は `src/script/manage_channels.py`。
+cron 用: `src/script/run_pipeline_step.sh`（sync / captions / summarizeを個別実行）、`src/script/send_message.sh`。従来の `get_summary_latest.sh` は手動実行用の一括ラッパーとして残しています。監査は `src/script/audit_channels.py`、チャンネル登録は `src/script/manage_channels.py`。
 
 ## どこを読むか（必要なときだけ）
 
