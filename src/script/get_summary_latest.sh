@@ -9,5 +9,6 @@ set -a
 source .env
 set +a
 export PYTHONPATH="$PROJECT_ROOT/src"
-python src/main.py latest
+python src/main.py sync
+python src/main.py captions
 python src/main.py summarize

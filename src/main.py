@@ -2,7 +2,6 @@ import os
 import sys
 import time
 from youtube_transcript_api._errors import IpBlocked, RequestBlocked
-from utils import fetch_rss_feed
 from utils import comparison_data
 from utils import get_caption
 from utils import get_summary
@@ -16,10 +15,31 @@ from classes.youtube_fetcher import YoutubeFetcher
 logger = get_logger(__name__)
 
 
-def fetch_captions(mode, dbManager):
-    """動画情報取得 + 字幕取得（YouTube 依存）"""
-    get_data(mode, dbManager)
+def sync_videos(dbManager):
+    """YouTube Data API の動画メタデータだけをDBへ同期する。"""
+    youtube_fetcher = YoutubeFetcher()
+    total_new = 0
 
+    for channel_id, channel_name in dbManager.get_all_channels():
+        logger.info(f"チャンネル動画同期中: {channel_name} ({channel_id})")
+        remote_videos = youtube_fetcher.fetch_all_videos(channel_id)
+        db_video_ids = dbManager.get_video_ids(channel_id)
+        new_data = comparison_data.filter_new_videos(db_video_ids, remote_videos)
+
+        if not new_data:
+            logger.info(f"新しい動画はありません: {channel_name}")
+            continue
+
+        logger.info(f"新しい動画を {len(new_data)} 件登録します: {channel_name}")
+        dbManager.save_db_new_data(new_data, channel_id, channel_name)
+        total_new += len(new_data)
+
+    logger.info(f"動画メタデータ同期完了: {total_new} 件を新規登録しました")
+    return total_new
+
+
+def fetch_pending_captions(dbManager):
+    """DBに登録済みで字幕未取得の動画だけから字幕を取得する。"""
     no_caption_record = dbManager.get_none_caption_record()
     if not no_caption_record:
         logger.info("caption が NULL のレコードはありません")
@@ -53,6 +73,13 @@ def fetch_captions(mode, dbManager):
 
         if index < len(no_caption_video_id) - 1:
             time.sleep(sleep_interval)
+
+
+def fetch_captions(mode, dbManager):
+    """必要なら動画同期を行い、その後に字幕だけを取得する。"""
+    if mode is not None:
+        get_data(mode, dbManager)
+    fetch_pending_captions(dbManager)
 
 
 def generate_summaries(dbManager):
@@ -93,42 +120,23 @@ def generate_summaries(dbManager):
 
 
 def get_data(mode, dbManager):
-    """指定されたモードによって動画情報を取得する"""
+    """動画メタデータを取得・登録する。字幕取得は呼び出し側で行う。"""
 
-    if mode == "latest":
-        for channel_id, channel_name in dbManager.get_all_channels():
-            logger.info(f"チャンネル処理中: {channel_name} ({channel_id})")
-            RSS_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-            new_data = fetch_rss_feed.get_latest_videos(RSS_URL)
-            db_data = dbManager.get_db_data(channel_id)
-            new_data = comparison_data.compare_data(db_data, new_data)
+    if mode in ("latest", "all", "sync"):
+        sync_videos(dbManager)
+        return
 
-            if not new_data:
-                logger.info(f"新しい動画はありません: {channel_name}")
-                continue
-
-            logger.info(f"新しい動画は {len(new_data)} 件です: {channel_name}")
-            dbManager.save_db_new_data(new_data, channel_id, channel_name)
-
-    elif mode == "all":
-        youtube_fetcher = YoutubeFetcher()
-        for channel_id, channel_name in dbManager.get_all_channels():
-            logger.info(f"チャンネル全動画取得: {channel_name} ({channel_id})")
-            new_data = youtube_fetcher.fetch_all_videos(channel_id)
-            dbManager.save_db_new_data(new_data, channel_id, channel_name)
-
-    else:
-        youtube_fetcher = YoutubeFetcher()
-        new_data = youtube_fetcher.get_video_info(mode)
-        if not new_data or not new_data.get("video_id"):
-            logger.error(f"動画情報を取得できませんでした: {mode}")
-            return
-        channel_id = new_data["channel_id"]
-        channel_name = new_data["channel_name"]
-        dbManager.save_db_new_data([new_data], channel_id, channel_name)
+    youtube_fetcher = YoutubeFetcher()
+    new_data = youtube_fetcher.get_video_info(mode)
+    if not new_data or not new_data.get("video_id"):
+        logger.error(f"動画情報を取得できませんでした: {mode}")
+        return
+    channel_id = new_data["channel_id"]
+    channel_name = new_data["channel_name"]
+    dbManager.save_db_new_data([new_data], channel_id, channel_name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = sys.argv
     if len(args) <= 1:
         logger.error("引数が不足しています")
@@ -137,12 +145,20 @@ if __name__ == '__main__':
     load_env()
     try:
         with DatabaseManager() as dbManager:
-            if args[1] == "summarize":
+            if args[1] == "sync":
+                logger.info("mode: sync（動画メタデータのみ）で実行します")
+                sync_videos(dbManager)
+
+            elif args[1] == "captions":
+                logger.info("mode: captions（字幕のみ）で実行します")
+                fetch_captions(None, dbManager)
+
+            elif args[1] == "summarize":
                 logger.info("mode: summarize で実行します")
                 generate_summaries(dbManager)
 
             elif args[1] in ("all", "latest"):
-                logger.info(f"mode: {args[1]} で実行します")
+                logger.info(f"mode: {args[1]}（動画同期 + 字幕）で実行します")
                 fetch_captions(args[1], dbManager)
 
             elif args[1] == "id":
