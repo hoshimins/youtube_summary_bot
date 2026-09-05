@@ -31,7 +31,9 @@ class YoutubeFetcher():
             "video_id": video_id,
             "title": item["title"],
             "published": item["publishedAt"],
-            "link": f'https://www.youtube.com/watch?v={video_id}'
+            "link": f'https://www.youtube.com/watch?v={video_id}',
+            "channel_id": item["channelId"],
+            "channel_name": item.get("channelTitle") or item["channelId"],
         }
 
     def _get_uploads_playlist_id(self, channel_id: str) -> str:

@@ -1,45 +1,52 @@
 # 動画要約のフロー図
-## 最新の動画を取得して要約を生成するフロー
+
+## 最新動画: 字幕取得（latest）
 
 ```mermaid
 graph TD
+Cron["Crontab get_summary_latest.sh"] -->|latest| Main["main.py"]
+Main --> DB["DatabaseManager get_db_data"]
+DB --> RSS["fetch_rss_feed get_latest_videos"]
+RSS --> compare{"compare_data"}
 
-Cron["Crontab get_summary_latest"] -->|Cron Trigger| YoutubeSummaryFeed["Main"]
-YoutubeSummaryFeed --> |DBの最新情報を取得| DB["DatabaseManager get_db_data(channel_id)"]
-DB --> |RSSから最新の情報を取得| RSS["fetch_rss_feed get_latest_videos(rss_url)"]
-RSS --> |DBとRSSをで差分があるか|compare{"compare_data"}
-
-compare -->|差分あり| NewDataFound["新着動画は◯件と出力"]
-NewDataFound --> |DBに新着動画を保存| DBUpdateNewData["DatabaseManager save_db_new_data()"]
-DBUpdateNewData --> |字幕情報を保存していないレコードを取得| GetNoCaptionRecord["DatabaseManager get_none_caption_record()"]
-GetNoCaptionRecord --> |動画の字幕を取得| CaptionFetcher["get_caption get_caption(video_id)"]
-CaptionFetcher --> |字幕をDBに保存| DBUpdateCaption["DatabaseManager save_caption_data(video_id, caption)"]
-DBUpdateCaption --> |要約を生成| SummaryGenerator["get_summary get_summary(caption)"]
-SummaryGenerator --> |要約をDBに保存| DBUpdateSummary["DatabaseManager save_summary_data(video_id, summary)"]
-DBUpdateSummary --> End["終了"]
-
-
-
-compare --> |差分なし| compare_end --> End 
+compare -->|差分あり| SaveNew["save_db_new_data"]
+SaveNew --> NoCap["get_none_caption_record"]
+NoCap --> Cap["get_caption"]
+Cap -->|成功| Prep["prepare_caption_for_storage"]
+Prep --> SaveCap["save_caption_data"]
+Cap -->|失敗| Mark["mark_caption_unavailable"]
+SaveCap --> End["終了 / 続けて summarize"]
+Mark --> End
+compare -->|差分なし| End
 ```
 
+## 要約生成（summarize）
 
-## チャンネルの全動画を取得する
 ```mermaid
 graph TD
-
-Cron["Crontab get_all_channel_video"] -->|Cron Trigger| YoutubeSummaryFeed["Main"]
-YoutubeSummaryFeed --> |指定ちゃんねるの全動画情報を取得| YoutubeFetcher["YoutubeFetcher get_all_videos(channel_id)"]
-YoutubeFetcher --> |取得した情報をDBに保存| SaveDB["DatabaseManager save_db_new_data(new_data, channel_id, channel_name)"]
-SaveDB --> End["終了"]
+Main["main.py summarize"] --> Rows["get_none_summary_record"]
+Rows --> Sum["get_summary (codex/openai/lmstudio)"]
+Sum --> Save["save_summary_data"]
+Save --> End["終了"]
 ```
 
-## 要約をDiscordに投稿するフロー
+## チャンネル全動画（all）
+
 ```mermaid
 graph TD
-Cron["Crontab send_summary_for_discord"] -->|Cron Trigger| DiscordSend["Main"]
-DiscordSend --> |要約をDiscordに送信| SendMessage["send_message_to_discord(summary)"]
-SendMessage --> End["終了"]
+Main["main.py all"] --> YF["YoutubeFetcher.fetch_all_videos"]
+YF --> Save["save_db_new_data"]
+Save --> CapLoop["fetch_captions と同様に未取得字幕を処理"]
+CapLoop --> End["終了"]
+```
 
+## Discord 投稿
 
+```mermaid
+graph TD
+Cron["Crontab send_message.sh"] --> Bot["bot/main.py"]
+Bot --> Get["get_not_send_summaries_data"]
+Get --> Send["Webhook 送信（1件・分割）"]
+Send --> Flag["update_summary_send_flag"]
+Flag --> End["終了"]
 ```

@@ -1,46 +1,69 @@
 import os
-import sys
-import discord
+import time
 import requests
 from classes.database_manager import DatabaseManager
+from utils.logger import get_logger
+from utils.notify import notify_failure
+
+logger = get_logger(__name__)
 
 
-class YoutubeSummaryBot(discord.Client):
+class YoutubeSummaryBot:
+    """Discord Webhook 経由で未送信要約を投稿する。"""
 
     def __init__(self):
         self.webhook_url = os.getenv("WEBHOOK_URL")
-        self.summary_text_ch = int(os.getenv("SUMMARY_TEXT_CHANNEL_ID"))
+        if not self.webhook_url:
+            raise ValueError("WEBHOOK_URL が設定されていません")
 
     async def get_summary(self):
-        db_manager = DatabaseManager()
-        summary_data = db_manager.get_not_send_summaries_data()
-        if not summary_data:
-            return
-        await self._send_summary_message(summary_data)
-        db_manager.update_summary_send_flag(summary_data[0][3])
-        db_manager._close()
+        with DatabaseManager() as db_manager:
+            summary_data = db_manager.get_not_send_summaries_data()
+            if not summary_data:
+                logger.info("未送信の要約はありません")
+                return
 
-    async def _send_summary_message(self, data):
-        MAX_MESSAGE_LENGTH = 1950  # Discordのメッセージの最大長は2000文字だが、安全に1950文字に設定
+            sent = self._send_summary_message(summary_data)
+            if sent:
+                db_manager.update_summary_send_flag(summary_data[0][3])
+            else:
+                title = summary_data[0][0]
+                video_id = summary_data[0][3]
+                logger.error(
+                    "Discord 送信が完了しなかったため summary_send_flag は更新しません"
+                )
+                notify_failure(
+                    "Discord 送信失敗",
+                    f"title={title}\nvideo_id={video_id}",
+                )
 
-        # 送信準備
+    def _send_summary_message(self, data) -> bool:
+        """全文送信に成功したら True。途中失敗したら False（フラグ更新しない）。"""
+        MAX_MESSAGE_LENGTH = 1950
+
         title = data[0][0].strip()
         summary = data[0][1].strip()
         url = data[0][2].strip()
 
-        # 最初にタイトルとURLを送信
         intro_message = f"**{title}**\n{url}"
         response = requests.post(self.webhook_url, json={"content": intro_message})
         if response.status_code != 204:
-            print(f"[1/1] Failed to send intro: {response.status_code}, {response.text}")
-            return
+            logger.error(f"イントロ送信失敗: {response.status_code}, {response.text}")
+            return False
 
-        # 本文を複数のメッセージ
-        chunks = [summary[i:i + MAX_MESSAGE_LENGTH] for i in range(0, len(summary), MAX_MESSAGE_LENGTH)]
+        chunks = [
+            summary[i:i + MAX_MESSAGE_LENGTH]
+            for i in range(0, len(summary), MAX_MESSAGE_LENGTH)
+        ]
         for idx, chunk in enumerate(chunks, start=1):
+            time.sleep(1)
             response = requests.post(self.webhook_url, json={"content": chunk})
             if response.status_code != 204:
-                print(f"[{idx}/{len(chunks)}] Failed to send: {response.status_code}, {response.text}")
-                break
+                logger.error(
+                    f"[{idx}/{len(chunks)}] メッセージ送信失敗: "
+                    f"{response.status_code}, {response.text}"
+                )
+                return False
 
-        print("Message sent successfully.")
+        logger.info(f"Discord 送信完了: {title}")
+        return True
