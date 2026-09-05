@@ -6,6 +6,7 @@ from utils import fetch_rss_feed
 from utils import comparison_data
 from utils import get_caption
 from utils import get_summary
+from utils.caption_text import prepare_caption_for_storage
 from utils.config import load_env
 from utils.logger import get_logger
 from classes.database_manager import DatabaseManager
@@ -38,8 +39,16 @@ def fetch_captions(mode, dbManager):
             dbManager.mark_caption_unavailable(video_id)
             continue
 
+        caption_txt = prepare_caption_for_storage(caption_txt)
+        if not caption_txt:
+            logger.warning(f"字幕が空のためスキップします: {video_id}")
+            dbManager.mark_caption_unavailable(video_id)
+            continue
+
         dbManager.save_caption_data(video_id, caption_txt)
-        logger.info(f"キャプションデータを保存しました: {video_id}")
+        logger.info(
+            f"キャプションデータを保存しました: {video_id} ({len(caption_txt)} 文字)"
+        )
 
 
 def generate_summaries(dbManager):
@@ -52,7 +61,12 @@ def generate_summaries(dbManager):
     logger.info(f"要約未生成の動画: {len(no_summary_record)} 件")
 
     for video_id, caption_txt in no_summary_record:
-        summary_text = get_summary.get_summary(caption_txt)
+        try:
+            summary_text = get_summary.get_summary(caption_txt)
+        except Exception as e:
+            logger.error(f"要約生成に失敗しました (video_id={video_id}): {e}")
+            continue
+
         dbManager.save_summary_data(video_id, summary_text)
         logger.info(f"要約データを保存しました: {video_id}")
 

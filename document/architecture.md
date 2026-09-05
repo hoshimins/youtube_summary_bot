@@ -1,58 +1,52 @@
 ```mermaid
 graph TD
     subgraph Crontab
-        LatestVideo[get_summary_latest]
-        AllChannelVideo[all_channel_video]
+        LatestVideo[get_summary_latest.sh]
+        SendMessage[send_message.sh]
     end
 
     subgraph Discord
-        DChannel[Discord Forum Channel]
+        DChannel[Discord Webhook Channel]
     end
 
     subgraph YoutubeSummaryFeed
-        MainScript[Main Script]
+        MainLatest[main.py latest]
+        MainSummarize[main.py summarize]
+        BotMain[bot/main.py]
         RSSFeed[RSS Feed]
         YoutubeFetcher[YoutubeFetcher]
-        CaptionFetcher[CaptionFetcher]
-        SummaryGenerator[SummaryGenerator]
+        CaptionFetcher[get_caption]
+        SummaryGenerator[get_summary]
         DatabaseManager[DatabaseManager]
     end
 
     subgraph External
-        YTAPI["YouTube Data API"]
-        Ollama["Summary API (Ollama or Local LLM)"]
+        YTAPI[YouTube Data API]
+        CodexCLI[Codex CLI on host]
+        OpenAIorLM[OpenAI / LM Studio optional]
     end
 
     subgraph Database
-        Postgres["PostgreSQL"]
+        Postgres[PostgreSQL]
     end
 
-    %% Crontab flow
-    LatestVideo -->|Cron Trigger| MainScript
-    AllChannelVideo -->|Cron Trigger| MainScript
+    LatestVideo -->|latest| MainLatest
+    LatestVideo -->|summarize| MainSummarize
+    SendMessage --> BotMain
 
+    MainLatest <--> RSSFeed
+    MainLatest <--> CaptionFetcher
+    MainLatest <--> DatabaseManager
+    MainLatest <--> YoutubeFetcher
 
-    %% MainScript internal flow
-    MainScript <--> |最新情報が存在するか確認する|RSSFeed
-    MainScript <--> |最新情報が存在する場合は、字幕を取得する|CaptionFetcher
-    MainScript <--> |要約を生成する|SummaryGenerator
-    MainScript <--> |データベースを管理する|DatabaseManager
-    MainScript <--> |YouTube APIを使用して動画情報を取得する|YoutubeFetcher
+    MainSummarize <--> SummaryGenerator
+    MainSummarize <--> DatabaseManager
 
-    RSSFeed -->|取得した情報を保存| DatabaseManager 
-    CaptionFetcher -->|取得した字幕を保存| DatabaseManager
-    SummaryGenerator -->|生成した要約を保存| DatabaseManager
-    YoutubeFetcher -->|取得した動画情報を保存| DatabaseManager
-
-    %% External API calls
+    CaptionFetcher -->|caption + truncate| DatabaseManager
+    SummaryGenerator -->|summary| DatabaseManager
     YoutubeFetcher --> YTAPI
-    SummaryGenerator --> Ollama
-
-    %% Database interactions
+    SummaryGenerator --> CodexCLI
+    SummaryGenerator -.-> OpenAIorLM
     DatabaseManager --> Postgres
-
-    %% MainScript outputs
-    MainScript -->|Cron Trigger| DChannel
-
-
+    BotMain -->|1 video / run| DChannel
 ```
