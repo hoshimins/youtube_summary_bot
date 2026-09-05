@@ -168,6 +168,7 @@ docker run --env-file .env youtube-summary-bot
 make run              # latest
 make run MODE=all
 make run MODE=summarize
+make test             # ローカル単体テスト（GitHub Actions なし）
 ```
 
 ## 今後の拡張案
